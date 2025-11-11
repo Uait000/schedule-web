@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import ScheduleItem, { isLessonCurrent } from '../components/ScheduleItem';
 import { NoteModal } from '../components/NoteModal';
-import { Schedule, OverridesResponse, Lesson } from '../types';
+import { Schedule, OverridesResponse, Lesson } from '../types'; // Удален Day
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'; 
 import { getISOWeek, getDay, format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -408,10 +408,9 @@ export function ScheduleScreen() {
     setIsMenuOpen(false);
 
     try {
-      const userType = localStorage.getItem('userType');
       const selectedId = localStorage.getItem('selectedId');
       
-      console.log('🔍 Проверка замен для:', { userType, selectedId });
+      console.log('🔍 Проверка замен для:', { selectedId });
       
       if (!selectedId) {
         showMessage('Ошибка: не выбрана группа/преподаватель');
@@ -456,7 +455,6 @@ export function ScheduleScreen() {
   };
 
   useEffect(() => {
-    const userType = localStorage.getItem('userType');
     const selectedId = localStorage.getItem('selectedId');
     if (!selectedId) {
       navigate('/');
@@ -476,8 +474,8 @@ export function ScheduleScreen() {
     Promise.all([schedulePromise, overridesPromise])
       .then(([scheduleData, overridesData]) => {
         if (scheduleData.weeks && Array.isArray(scheduleData.weeks)) {
-          scheduleData.weeks = scheduleData.weeks.map(week=>{
-            week.days = week.days.map(day=>{
+          scheduleData.weeks = scheduleData.weeks.map((week: any)=>{
+            week.days = week.days.map((day: any)=>{
               day.lesson = day.lesson.map(normalizeLesson)
               return day
             })
@@ -491,7 +489,7 @@ export function ScheduleScreen() {
         
         // Обрабатываем замены для всех пользователей
         if (overridesData) {
-          overridesData.overrides = overridesData.overrides.map(override=>{
+          overridesData.overrides = overridesData.overrides.map((override: any)=>{
             override.shouldBe = normalizeLesson(override.shouldBe)
             override.willBe = normalizeLesson(override.willBe)
             return override
@@ -500,6 +498,7 @@ export function ScheduleScreen() {
           console.log('🔄 Замены:', overridesData)
           setOverrides(overridesData);
 
+          // Сохраняем замены для всех пользователей
           if (!storedOverrides) {
             const currentOverrides = localStorage.getItem('overrides');
             const overridesDataObj = currentOverrides ? JSON.parse(currentOverrides) : {};

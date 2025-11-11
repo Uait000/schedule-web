@@ -3,11 +3,7 @@ import '../App.css';
 import { useNavigate } from 'react-router-dom';
 import { fetchData, API_BASE_URL } from '../api';
 
-interface Group {
-  id: string;
-  name: string;
-}
-
+// Удален неиспользуемый интерфейс Group
 type UserType = 'student' | 'teacher';
 
 interface Items {
