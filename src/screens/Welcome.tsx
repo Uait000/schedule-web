@@ -10,15 +10,38 @@ interface Group {
 
 type UserType = 'student' | 'teacher';
 
+interface Items {
+	teachers: string[];
+	groups: string[];
+}
+
+export const API_BASE_URL = 'https://ttgt-api-isxb.onrender.com/schedule';
+
+console.log('🔧 Прямое подключение к API:', API_BASE_URL);
+
+export const fetchData = async (url: string) => {
+  try {
+    console.log('🔄 Запрос к:', url);
+    const response = await fetch(API_BASE_URL+url);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    console.log('✅ Ответ от сервера:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ Ошибка fetch:', error);
+    throw error;
+  }
+};
+
 export function WelcomeScreen() {
   const navigate = useNavigate();
 
   const [userType, setUserType] = useState<UserType>('student');
   const [course, setCourse] = useState(0);
-
   
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [teachers, setTeachers] = useState<string[]>([]);
+  const [items, setItems] = useState<Items>({ teachers: [], groups: [] });
   
   const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [selectedTeacher, setSelectedTeacher] = useState<string>('');
@@ -30,121 +53,34 @@ export function WelcomeScreen() {
   const isStudent = userType === 'student';
 
   
-  const API_BASE_URL = 'https://ttgt-api-isxb.onrender.com';
-
-  console.log('🔧 Прямое подключение к API:', API_BASE_URL);
-
-  const fetchData = async (url: string) => {
-    try {
-      console.log('🔄 Запрос к:', url);
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      console.log('✅ Ответ от сервера:', data);
-      return data;
-    } catch (error) {
-      console.error('❌ Ошибка fetch:', error);
-      throw error;
-    }
-  };
-
-  
   useEffect(() => {
     setIsLoading(true);
     setError(null);
-    
-    if (isStudent) {
-      
-      const endpoints = [
-        '/api/groups',
-        '/groups',
-        '/GetGroups',
-        '/getGroups'
-      ];
 
-      const tryEndpoints = async (endpoints: string[]) => {
-        for (const endpoint of endpoints) {
-          try {
-            console.log(`🔄 Пробуем эндпоинт: ${endpoint}`);
-            const data = await fetchData(`${API_BASE_URL}${endpoint}`);
-            if (data && (data.groups || Array.isArray(data))) {
-              console.log(`✅ Успех с эндпоинтом: ${endpoint}`);
-              setGroups(data.groups || data);
-              return;
-            }
-          } catch (error) {
-            console.log(`❌ Эндпоинт ${endpoint} не сработал`);
-          }
-        }
-        throw new Error('Не удалось найти рабочий эндпоинт для групп');
-      };
-
-      setTeachers([]);
-      tryEndpoints(endpoints)
-        .catch(err => {
-          console.error('❌ Ошибка при загрузке групп!', err);
-          setError('Не удалось загрузить список групп с сервера.');
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
-
-    } else {
-      
-      const endpoints = [
-        '/api/teachers',
-        '/teachers',
-        '/GetTeachers',
-        '/getTeachers'
-      ];
-
-      const tryEndpoints = async (endpoints: string[]) => {
-        for (const endpoint of endpoints) {
-          try {
-            console.log(`🔄 Пробуем эндпоинт: ${endpoint}`);
-            const data = await fetchData(`${API_BASE_URL}${endpoint}`);
-            if (data && (data.teacher || Array.isArray(data))) {
-              console.log(`✅ Успех с эндпоинтом: ${endpoint}`);
-              setTeachers(data.teacher || data);
-              return;
-            }
-          } catch (error) {
-            console.log(`❌ Эндпоинт ${endpoint} не сработал`);
-          }
-        }
-        throw new Error('Не удалось найти рабочий эндпоинт для преподавателей');
-      };
-
-      setGroups([]);
-      tryEndpoints(endpoints)
-        .then(data => {
-          console.log('✅ Получены преподаватели:', data);
-        })
-        .catch(err => {
-          console.error('❌ Ошибка при загрузке преподавателей!', err);
-          setError('Не удалось загрузить список преподавателей с сервера.');
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
-    }
-  }, [isStudent, API_BASE_URL]);
+	fetchData(`/items`)
+		.catch((error)=>{
+			console.error("Ошибка получения элементов:", error)
+		})
+		.then((result)=>{
+			setIsLoading(false)
+			setItems({
+				groups: result.groups.sort(),
+				teachers: result.teachers.sort()
+			})
+		})
+  }, [API_BASE_URL]);
 
   
-  const filteredGroups = groups
+  const filteredGroups = items.groups
     .filter(group => 
-      course === 0 || group.name.includes(`-${course}-`)
-    )
-    .sort((a, b) => a.name.localeCompare(b.name));
+      course === 0 || group.includes(`-${course}-`)
+    );
 
-  const filteredTeachers = teachers
+  const filteredTeachers = items.teachers
     .filter(teacher => 
       teacher.toLowerCase().replace(/\s/g, '').replace(/\./g, '')
         .includes(teacherQuery.toLowerCase().replace(/\s/g, '').replace(/\./g, ''))
-    )
-    .sort();
+    );
 
   function handleNextClick() {
     if (!selectedGroup && !selectedTeacher) return;
@@ -194,11 +130,11 @@ export function WelcomeScreen() {
               <div className="groupGrid">
                 {filteredGroups.map(group => (
                   <button
-                    key={group.id}
-                    className={selectedGroup === group.id ? 'groupButton active' : 'groupButton'}
-                    onClick={() => setSelectedGroup(group.id)}
+                    key={group}
+                    className={selectedGroup === group ? 'groupButton active' : 'groupButton'}
+                    onClick={() => setSelectedGroup(group)}
                   >
-                    {group.name}
+                    {group}
                   </button>
                 ))}
               </div>

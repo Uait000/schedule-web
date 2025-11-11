@@ -5,6 +5,7 @@ import { Schedule, OverridesResponse } from '../types';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'; 
 import { getISOWeek, getDay, format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import { fetchData, API_BASE_URL } from './Welcome'
 
 interface LessonData {
   notes: string;
@@ -12,6 +13,16 @@ interface LessonData {
 }
 
 const DAYS_OF_WEEK = [ 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота' ];
+
+export function normalizeLesson(lesson: Lesson) {
+	if (lesson == null) {
+		return { noLesson: {}, lesson: "noLesson" }
+	}
+	if (lesson.subgroupedLesson) lesson.lesson = "subgroupedLesson"
+	if (lesson.commonLesson) lesson.lesson = "commonLesson"
+
+	return lesson
+}
 
 function getWeekNumber(date: Date): number {
   const weekOfYear = getISOWeek(date);
@@ -339,48 +350,6 @@ export function ScheduleScreen() {
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
 
-  const API_BASE_URL = 'https://ttgt-api-isxb.onrender.com';
-
-  console.log('🔧 Прямое подключение к API:', API_BASE_URL);
-
-
-
-const fetchData = async (endpoint: string, params?: Record<string, string>) => {
-  try {
-
-    const endpoints = [
-      endpoint,
-      endpoint.replace('/api/', '/'),
-      `/api${endpoint}`,
-      endpoint.toLowerCase(),
-      endpoint.replace('get', 'Get')
-    ];
-
-    for (const testEndpoint of endpoints) {
-      try {
-        const urlParams = params ? new URLSearchParams(params) : '';
-        const url = params ? `${API_BASE_URL}${testEndpoint}?${urlParams}` : `${API_BASE_URL}${testEndpoint}`;
-        
-        console.log(`🔄 Пробуем: ${url}`);
-        const response = await fetch(url);
-        
-        if (response.ok) {
-          console.log(`✅ Успех с эндпоинтом: ${testEndpoint}`);
-          return await response.json();
-        }
-      } catch (error) {
-        console.log(`❌ Эндпоинт ${testEndpoint} не сработал`);
-      }
-    }
-    
-    throw new Error(`Не удалось найти рабочий эндпоинт для ${endpoint}`);
-  } catch (error) {
-    console.error('❌ Ошибка fetch:', error);
-    throw error;
-  }
-};
-
-
   const handleTouchStart = (e: React.TouchEvent) => {
     setTouchStart(e.targetTouches[0].clientX);
   };
@@ -453,10 +422,7 @@ const fetchData = async (endpoint: string, params?: Record<string, string>) => {
       }
 
 
-      const newOverrides = await fetchData('/api/overrides', { 
-        id: selectedId, 
-        type: userType || 'student'
-      });
+      const newOverrides = await fetchData(`/${selectedId}/overrides`);
       
       setOverrides(newOverrides);
 
@@ -498,33 +464,45 @@ const fetchData = async (endpoint: string, params?: Record<string, string>) => {
       return;
     }
 
-    const params = { id: selectedId, type: userType || 'student' };
-
-
-    const schedulePromise = fetchData('/schedule', params)
+    const schedulePromise = fetchData(`/${selectedId}/schedule`)
     
     const storedOverridesRaw = localStorage.getItem('overrides');
     const storedOverrides = storedOverridesRaw ? JSON.parse(storedOverridesRaw)[selectedId] : null;
     
     const overridesPromise = storedOverrides 
       ? Promise.resolve(storedOverrides)
-      : fetchData('/overrides', params)
+      : fetchData(`/${selectedId}/overrides`)
 
     Promise.all([schedulePromise, overridesPromise])
       .then(([scheduleData, overridesData]) => {
         if (scheduleData.weeks && Array.isArray(scheduleData.weeks)) {
+        	scheduleData.weeks = scheduleData.weeks.map(week=>{
+        		week.days = week.days.map(day=>{
+        			day.lesson = day.lesson.map(normalizeLesson)
+
+        			return day
+        		})
+
+        		return week
+        	})
+        	console.log(scheduleData)
           setFullSchedule(scheduleData);
         } else {
           setError('Ошибка: Расписание пришло в неверном формате.');
         }
-        
+		overridesData.overrides = overridesData.overrides.map(override=>{
+			override.shouldBe = normalizeLesson(override.shouldBe)
+			override.willBe = normalizeLesson(override.willBe)
+
+			return override
+		})
+		     
         setOverrides(overridesData);
 
         if (!storedOverrides) {
           const currentOverrides = localStorage.getItem('overrides');
-          const overridesData = currentOverrides ? JSON.parse(currentOverrides) : {};
-          overridesData[selectedId] = overridesData;
-          localStorage.setItem('overrides', JSON.stringify(overridesData));
+          overridesData[selectedId] = currentOverrides ? JSON.parse(currentOverrides) : {};
+          localStorage.setItem('overrides', currentOverrides ? currentOverrides : "{}");
         }
       })
       .catch(err => {
@@ -534,7 +512,7 @@ const fetchData = async (endpoint: string, params?: Record<string, string>) => {
       .finally(() => {
         setIsLoading(false);
       });
-  }, [navigate, API_BASE_URL]); 
+  }, [navigate]); 
 
 
   const hasNoteForLesson = (lessonIndex: number): boolean => {
@@ -557,7 +535,7 @@ const fetchData = async (endpoint: string, params?: Record<string, string>) => {
   const lessonsToShow = useMemo(() => {
     const baseLessons = displaySchedule?.weeks?.[activeWeekIndex]?.days?.[activeDayIndex]?.lesson || [];
     const lessonsArray = Array.isArray(baseLessons) ? baseLessons : [];
-    return lessonsArray.slice(0, 5);
+    return lessonsArray.slice(0, 5).map(lesson=>lesson ? lesson : {noLesson: {}});
   }, [displaySchedule, activeWeekIndex, activeDayIndex]);
   
   const renderLessonsWithClassHour = () => {
