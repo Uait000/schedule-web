@@ -1,11 +1,11 @@
 import { useNavigate } from 'react-router-dom';
 import ScheduleItem, { isLessonCurrent } from '../components/ScheduleItem';
 import { NoteModal } from '../components/NoteModal';
-import { Schedule, OverridesResponse } from '../types';
+import { Schedule, OverridesResponse, Lesson } from '../types';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'; 
 import { getISOWeek, getDay, format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { fetchData, API_BASE_URL } from './Welcome'
+import { fetchData, API_BASE_URL } from '../api';
 
 interface LessonData {
   notes: string;
@@ -15,13 +15,11 @@ interface LessonData {
 const DAYS_OF_WEEK = [ 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота' ];
 
 export function normalizeLesson(lesson: Lesson) {
-	if (lesson == null) {
-		return { noLesson: {}, lesson: "noLesson" }
-	}
-	if (lesson.subgroupedLesson) lesson.lesson = "subgroupedLesson"
-	if (lesson.commonLesson) lesson.lesson = "commonLesson"
-
-	return lesson
+  if (lesson == null) {
+    return { noLesson: {} };
+  }
+  
+  return lesson;
 }
 
 function getWeekNumber(date: Date): number {
@@ -345,10 +343,8 @@ export function ScheduleScreen() {
     return saved ? JSON.parse(saved) : true;
   });
 
-
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
-
 
   const handleTouchStart = (e: React.TouchEvent) => {
     setTouchStart(e.targetTouches[0].clientX);
@@ -367,10 +363,8 @@ export function ScheduleScreen() {
     if (Math.abs(distance) < minSwipeDistance) return;
 
     if (distance > 0) {
-
       setActiveDayIndex(prev => (prev + 1) % DAYS_OF_WEEK.length);
     } else {
-
       setActiveDayIndex(prev => (prev - 1 + DAYS_OF_WEEK.length) % DAYS_OF_WEEK.length);
     }
     
@@ -416,23 +410,28 @@ export function ScheduleScreen() {
     try {
       const userType = localStorage.getItem('userType');
       const selectedId = localStorage.getItem('selectedId');
+      
+      console.log('🔍 Проверка замен для:', { userType, selectedId });
+      
       if (!selectedId) {
         showMessage('Ошибка: не выбрана группа/преподаватель');
         return;
       }
 
-
       const newOverrides = await fetchData(`/${selectedId}/overrides`);
+      
+      console.log('✅ Получены замены:', newOverrides);
       
       setOverrides(newOverrides);
 
+      // Сохраняем для всех пользователей
       const currentOverrides = localStorage.getItem('overrides');
       const overridesData = currentOverrides ? JSON.parse(currentOverrides) : {};
       overridesData[selectedId] = newOverrides;
       localStorage.setItem('overrides', JSON.stringify(overridesData));
 
       if (newOverrides.overrides && newOverrides.overrides.length > 0) {
-        showMessage('Обнаружены изменения в расписании!');
+        showMessage(`Обнаружены изменения: ${newOverrides.overrides.length} замен`);
       } else {
         showMessage('Изменений не обнаружено');
       }
@@ -466,6 +465,7 @@ export function ScheduleScreen() {
 
     const schedulePromise = fetchData(`/${selectedId}/schedule`)
     
+    // Загружаем замены для всех пользователей
     const storedOverridesRaw = localStorage.getItem('overrides');
     const storedOverrides = storedOverridesRaw ? JSON.parse(storedOverridesRaw)[selectedId] : null;
     
@@ -476,33 +476,37 @@ export function ScheduleScreen() {
     Promise.all([schedulePromise, overridesPromise])
       .then(([scheduleData, overridesData]) => {
         if (scheduleData.weeks && Array.isArray(scheduleData.weeks)) {
-        	scheduleData.weeks = scheduleData.weeks.map(week=>{
-        		week.days = week.days.map(day=>{
-        			day.lesson = day.lesson.map(normalizeLesson)
-
-        			return day
-        		})
-
-        		return week
-        	})
-        	console.log(scheduleData)
+          scheduleData.weeks = scheduleData.weeks.map(week=>{
+            week.days = week.days.map(day=>{
+              day.lesson = day.lesson.map(normalizeLesson)
+              return day
+            })
+            return week
+          })
+          console.log('📅 Расписание:', scheduleData)
           setFullSchedule(scheduleData);
         } else {
           setError('Ошибка: Расписание пришло в неверном формате.');
         }
-		overridesData.overrides = overridesData.overrides.map(override=>{
-			override.shouldBe = normalizeLesson(override.shouldBe)
-			override.willBe = normalizeLesson(override.willBe)
+        
+        // Обрабатываем замены для всех пользователей
+        if (overridesData) {
+          overridesData.overrides = overridesData.overrides.map(override=>{
+            override.shouldBe = normalizeLesson(override.shouldBe)
+            override.willBe = normalizeLesson(override.willBe)
+            return override
+          })
+          
+          console.log('🔄 Замены:', overridesData)
+          setOverrides(overridesData);
 
-			return override
-		})
-		     
-        setOverrides(overridesData);
-
-        if (!storedOverrides) {
-          const currentOverrides = localStorage.getItem('overrides');
-          overridesData[selectedId] = currentOverrides ? JSON.parse(currentOverrides) : {};
-          localStorage.setItem('overrides', currentOverrides ? currentOverrides : "{}");
+          if (!storedOverrides) {
+            const currentOverrides = localStorage.getItem('overrides');
+            const overridesDataObj = currentOverrides ? JSON.parse(currentOverrides) : {};
+            overridesDataObj[selectedId] = overridesData;
+            localStorage.setItem('overrides', JSON.stringify(overridesDataObj));
+            console.log('💾 Сохранены замены для:', selectedId)
+          }
         }
       })
       .catch(err => {
@@ -513,7 +517,6 @@ export function ScheduleScreen() {
         setIsLoading(false);
       });
   }, [navigate]); 
-
 
   const hasNoteForLesson = (lessonIndex: number): boolean => {
     const lessonData = getSavedLessonData(activeWeekIndex, activeDayIndex, lessonIndex);
@@ -557,7 +560,7 @@ export function ScheduleScreen() {
             isTuesday={true}
             hasNote={hasNoteForLesson(i)} 
             onClick={() => {
-              if (lessonsToShow[i].lesson !== 'noLesson' && lessonsToShow[i].lesson !== 'LESSON_NOT_SET') {
+              if (!lessonsToShow[i].noLesson) {
                 setEditingLessonIndex(i);
               }
             }}
@@ -570,7 +573,7 @@ export function ScheduleScreen() {
       result.push(
         <ScheduleItem 
           key="class-hour"
-          lesson={{ lesson: 'commonLesson' }} 
+          lesson={{ commonLesson: { name: 'Классный час', teacher: '', room: '' } }} 
           index={classHourIndex} 
           isCurrent={isClassHourCurrent}
           isTuesday={true}
@@ -592,7 +595,7 @@ export function ScheduleScreen() {
             isTuesday={true}
             hasNote={hasNoteForLesson(lessonIndex4)}
             onClick={() => {
-              if (lessonsToShow[lessonIndex4].lesson !== 'noLesson' && lessonsToShow[lessonIndex4].lesson !== 'LESSON_NOT_SET') {
+              if (!lessonsToShow[lessonIndex4].noLesson) {
                 setEditingLessonIndex(lessonIndex4);
               }
             }}
@@ -612,7 +615,7 @@ export function ScheduleScreen() {
               isTuesday={true}
               hasNote={hasNoteForLesson(lessonIndex5)} 
               onClick={() => {
-                if (lessonsToShow[lessonIndex5].lesson !== 'noLesson' && lessonsToShow[lessonIndex5].lesson !== 'LESSON_NOT_SET') {
+                if (!lessonsToShow[lessonIndex5].noLesson) {
                   setEditingLessonIndex(lessonIndex5);
                 }
               }}
@@ -635,7 +638,7 @@ export function ScheduleScreen() {
           isCurrent={isCurrent}
           hasNote={hasNoteForLesson(index)} 
           onClick={() => {
-            if (lesson.lesson !== 'noLesson' && lesson.lesson !== 'LESSON_NOT_SET') {
+            if (!lesson.noLesson) {
               setEditingLessonIndex(index);
             }
           }}
@@ -765,6 +768,10 @@ export function ScheduleScreen() {
         {/* Отладочная информация */}
         <div className="debug-info" style={{ marginTop: '20px', fontSize: '12px', color: '#666', textAlign: 'center' }}>
           <p><strong>Прямое подключение к:</strong> {API_BASE_URL}</p>
+          <p><strong>Тип пользователя:</strong> {localStorage.getItem('userType')}</p>
+          <p><strong>ID:</strong> {localStorage.getItem('selectedId')}</p>
+          <p><strong>Замены:</strong> {overrides?.overrides?.length || 0} шт.</p>
+          <p><strong>Применяются замены:</strong> {applyOverrides ? 'Да' : 'Нет'}</p>
         </div>
       </div>
     </>

@@ -4,36 +4,27 @@ export interface CommonLesson {
   room: string;
 }
 
-
 export interface SubgroupedLessonData {
   teacher: string;
   room: string;
   subgroup_index: number;
 }
 
-
 export interface SubgroupedLesson {
   name: string;
   subgroups: SubgroupedLessonData[];
 }
 
-
 export interface Lesson {
-  
-  lesson: 'commonLesson' | 'subgroupedLesson' | 'noLesson' | 'LESSON_NOT_SET'; 
-  
   commonLesson?: CommonLesson;
   subgroupedLesson?: SubgroupedLesson;
   noLesson?: object; 
   group?: string;
 }
 
-
 export interface Day {
-  
   lesson: Lesson[]; 
 }
-
 
 export interface Schedule {
   weeks: {
@@ -41,11 +32,12 @@ export interface Schedule {
   }[];
 }
 
-
 export interface Override {
   index: number;
   willBe: Lesson;
+  shouldBe: Lesson;
 }
+
 export interface OverridesResponse {
   weekNum: number;
   weekDay: number;

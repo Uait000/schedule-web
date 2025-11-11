@@ -1,4 +1,3 @@
-
 import { Lesson } from '../types';
 import '../App.css'; 
 
@@ -9,7 +8,6 @@ const LESSON_TIMES = [
   { start: '13:30', end: '15:00' },
   { start: '15:10', end: '16:40' },
 ];
-
 
 const TUESDAY_SPECIAL_TIMES = [
   { start: '08:00', end: '09:30' },
@@ -30,18 +28,15 @@ interface ScheduleItemProps {
   hasNote?: boolean; 
 }
 
-
 const timeToMinutes = (time: string): number => {
   const [hours, minutes] = time.split(':').map(Number);
   return hours * 60 + minutes;
 };
 
-
 export const isLessonCurrent = (lessonIndex: number, isTuesday: boolean = false): boolean => {
   const now = new Date();
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
   const dayOfWeek = now.getDay(); 
-  
   
   const currentDayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
   const isCurrentDay = isTuesday ? currentDayIndex === 1 : currentDayIndex !== 1;
@@ -57,7 +52,6 @@ export const isLessonCurrent = (lessonIndex: number, isTuesday: boolean = false)
   
   return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
 };
-
 
 export const getLessonTime = (index: number, isTuesday: boolean = false): string => {
   const times = isTuesday ? TUESDAY_SPECIAL_TIMES : LESSON_TIMES;
@@ -80,7 +74,7 @@ const LessonContent = ({ lesson, isClassHour }: { lesson: Lesson, isClassHour?: 
     );
   }
 
-  if (lesson.lesson === 'commonLesson' && lesson.commonLesson) {
+  if (lesson.commonLesson) {
     const { name, teacher, room } = lesson.commonLesson;
     return (
       <div className="lesson-content">
@@ -94,7 +88,7 @@ const LessonContent = ({ lesson, isClassHour }: { lesson: Lesson, isClassHour?: 
     );
   }
 
-  if (lesson.lesson === 'subgroupedLesson' && lesson.subgroupedLesson) {
+  if (lesson.subgroupedLesson) {
     const { name, subgroups } = lesson.subgroupedLesson;
     return (
       <div className="lesson-content">
@@ -109,6 +103,14 @@ const LessonContent = ({ lesson, isClassHour }: { lesson: Lesson, isClassHour?: 
             </span>
           </div>
         ))}
+      </div>
+    );
+  }
+
+  if (lesson.noLesson) {
+    return (
+      <div className="lesson-content">
+        <span className="lesson-name">Пары нет</span>
       </div>
     );
   }
@@ -135,9 +137,7 @@ export default function ScheduleItem({
 }: ScheduleItemProps) {
   const time = getLessonTime(index, isTuesday);
   
-  
-  const isEmpty = !isClassHour && (lesson.lesson === 'noLesson' || lesson.lesson === 'LESSON_NOT_SET' || lesson.noLesson);
-
+  const isEmpty = !isClassHour && (lesson.noLesson || !lesson.commonLesson && !lesson.subgroupedLesson);
   
   if (isClassHour) {
     return (
@@ -153,7 +153,6 @@ export default function ScheduleItem({
     );
   }
 
-  
   if (isEmpty) {
     return (
       <div className={`lesson-card empty ${isCurrent ? 'current-lesson' : ''}`}>
@@ -170,7 +169,6 @@ export default function ScheduleItem({
     );
   }
 
-  
   return (
     <button className={`lesson-card clickable ${isCurrent ? 'current-lesson' : ''}`} onClick={onClick}>
       <span className="lesson-index">{index + 1}.</span>
@@ -180,7 +178,6 @@ export default function ScheduleItem({
       <div className="lesson-time-with-icon">
         <span className="lesson-time">{time}</span>
         <div className="edit-icons">
-
           {hasNote && (
             <span className="note-icon" title="Есть заметка">
               <Icon name="sticky_note_2" style={{ fontSize: '18px' }} />
