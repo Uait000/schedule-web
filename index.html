@@ -1,16 +1,31 @@
 <!DOCTYPE html>
 <html lang="ru">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    
-    <title>Расписание</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <!-- 🔥 ОБЯЗАТЕЛЬНЫЕ Telegram Mini App мета-теги -->
+  <meta name="telegram-web-app" content="1">
+  <meta name="format-detection" content="telephone=no">
+  
+  <!-- PWA мета-теги -->
+  <meta name="theme-color" content="#000000"/>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="TTGT Schedule">
+  
+  <!-- Дополнительные мета-теги -->
+  <meta name="description" content="Расписание для студентов и преподавателей ТТГТ">
+  <meta name="keywords" content="расписание, студенты, преподаватели, ТТГТ">
+  
+  <title>Schedule TTGT</title>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+  
+  <!-- 🔥 Скрипт Telegram Web App -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</body>
 </html>

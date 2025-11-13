@@ -7,13 +7,16 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy:yandex": "chmod +x deploy-yandex.sh && ./deploy-yandex.sh",
+    "deploy:full": "npm run build && npm run deploy:yandex"
   },
   "dependencies": {
     "date-fns": "^4.1.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "react-router-dom": "^7.9.5"
+    "react-router-dom": "^7.9.5",
+    "vite-plugin-pwa": "^1.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
