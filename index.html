@@ -1,31 +1,314 @@
 <!DOCTYPE html>
 <html lang="ru">
-<head>
-  <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  
-  <!-- 🔥 ОБЯЗАТЕЛЬНЫЕ Telegram Mini App мета-теги -->
-  <meta name="telegram-web-app" content="1">
-  <meta name="format-detection" content="telephone=no">
-  
-  <!-- PWA мета-теги -->
-  <meta name="theme-color" content="#000000"/>
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="TTGT Schedule">
-  
-  <!-- Дополнительные мета-теги -->
-  <meta name="description" content="Расписание для студентов и преподавателей ТТГТ">
-  <meta name="keywords" content="расписание, студенты, преподаватели, ТТГТ">
-  
-  <title>Schedule TTGT</title>
-</head>
-<body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.tsx"></script>
-  
-  <!-- 🔥 Скрипт Telegram Web App -->
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/react.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Расписание ТТЖТ</title>
+    <meta name="description" content="Расписание занятий для студентов и преподавателей ТТЖТ">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" crossorigin="use-credentials">
+    
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#1976d2" />
+    <meta name="msapplication-TileColor" content="#1976d2">
+    
+    <!-- Modern PWA meta tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Расписание ТТЖТ">
+    
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" href="/icon-192x192.png">
+    
+    <!-- Material Icons with optimized preload -->
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preload" href="https://fonts.gstatic.com/s/materialicons/v140/flUhRq6tzZclQEJ-Vdg-IuiaDsNc.woff2" as="font" type="font/woff2" crossorigin="anonymous" onload="this.onload=null;this.rel='font-preload'">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    
+    <!-- Preload critical resources -->
+    <link rel="preconnect" href="https://ttgt-api-isxb.onrender.com">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    
+    <style>
+      /* Install Prompt Styling */
+      .install-prompt {
+        position: fixed;
+        bottom: 100px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--color-surface, #ffffff);
+        border: 2px solid var(--color-primary, #1976d2);
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        z-index: 10000;
+        max-width: 320px;
+        width: 90%;
+        text-align: center;
+        animation: slideUp 0.3s ease;
+      }
+
+      .install-prompt button {
+        background: var(--color-primary, #1976d2);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        padding: 12px 20px;
+        margin: 8px 4px;
+        cursor: pointer;
+        font-weight: 500;
+        font-size: 14px;
+        transition: all 0.2s ease;
+      }
+
+      .install-prompt button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3);
+      }
+
+      .install-prompt button.secondary {
+        background: transparent;
+        color: var(--color-text, #333333);
+        border: 1px solid var(--color-border, #ddd);
+      }
+
+      @keyframes slideUp {
+        from {
+          opacity: 0;
+          transform: translateX(-50%) translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(-50%) translateY(0);
+        }
+      }
+
+      /* Fallback for Material Icons during load */
+      .material-icons {
+        font-family: 'Material Icons';
+        font-weight: normal;
+        font-style: normal;
+        font-size: 24px;
+        line-height: 1;
+        letter-spacing: normal;
+        text-transform: none;
+        display: inline-block;
+        white-space: nowrap;
+        word-wrap: normal;
+        direction: ltr;
+        -webkit-font-feature-settings: 'liga';
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* Ensure icons are visible even if font fails */
+      .material-icons::before {
+        content: '★';
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        display: none;
+      }
+
+      .fonts-loaded .material-icons::before {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    
+    <!-- Install Prompt -->
+    <div id="install-prompt" class="install-prompt" style="display: none;">
+      <div style="font-size: 48px; margin-bottom: 8px;">📱</div>
+      <p style="margin: 0 0 12px 0; font-weight: 600; font-size: 16px;">Установить приложение?</p>
+      <p style="margin: 0 0 16px 0; font-size: 14px; color: var(--color-secondary-text, #666);">
+        Получите быстрый доступ к расписанию с главного экрана
+      </p>
+      <button id="install-button">Установить</button>
+      <button id="cancel-install" class="secondary">Позже</button>
+    </div>
+    
+    <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- PWA Installation Logic -->
+    <script>
+      // Font loading optimization
+      function optimizeFontLoading() {
+        // Check if Material Icons font is loaded
+        if (document.fonts) {
+          document.fonts.load('1em Material Icons').then(() => {
+            document.documentElement.classList.add('fonts-loaded');
+          }).catch(() => {
+            console.log('Material Icons font load failed, using fallback');
+          });
+        }
+
+        // Remove preload link after font is used to avoid warnings
+        const preloadLink = document.querySelector('link[as="font"]');
+        if (preloadLink) {
+          setTimeout(() => {
+            if (preloadLink.parentNode) {
+              preloadLink.parentNode.removeChild(preloadLink);
+            }
+          }, 3000);
+        }
+      }
+
+      class PWAInstaller {
+        constructor() {
+          this.deferredPrompt = null;
+          this.installPrompt = document.getElementById('install-prompt');
+          this.installButton = document.getElementById('install-button');
+          this.cancelButton = document.getElementById('cancel-install');
+          
+          this.init();
+        }
+        
+        init() {
+          this.setupEventListeners();
+          this.registerServiceWorker();
+          this.checkPWAStatus();
+        }
+
+        checkPWAStatus() {
+          // Check if app is running as PWA
+          const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+          const isIOSStandalone = navigator.standalone;
+          
+          if (isStandalone || isIOSStandalone) {
+            console.log('🚀 Приложение запущено как PWA');
+            document.documentElement.classList.add('pwa-mode');
+          }
+        }
+        
+        setupEventListeners() {
+          // BeforeInstallPrompt event
+          window.addEventListener('beforeinstallprompt', (e) => {
+            console.log('📲 BeforeInstallPrompt event fired');
+            e.preventDefault();
+            this.deferredPrompt = e;
+            
+            // Show prompt after 5 seconds
+            setTimeout(() => {
+              this.showInstallPrompt();
+            }, 5000);
+          });
+          
+          // App installed event
+          window.addEventListener('appinstalled', (e) => {
+            console.log('✅ PWA установлено успешно');
+            this.hideInstallPrompt();
+            this.deferredPrompt = null;
+            localStorage.setItem('pwaInstalled', 'true');
+          });
+          
+          // Install button
+          this.installButton.addEventListener('click', () => {
+            this.installPWA();
+          });
+          
+          // Cancel button
+          this.cancelButton.addEventListener('click', () => {
+            this.hideInstallPrompt();
+            localStorage.setItem('installPromptDismissed', Date.now().toString());
+          });
+        }
+        
+        showInstallPrompt() {
+          if (localStorage.getItem('pwaInstalled') === 'true') return;
+          
+          const lastDismissed = localStorage.getItem('installPromptDismissed');
+          if (lastDismissed) {
+            const oneDay = 24 * 60 * 60 * 1000;
+            if (Date.now() - parseInt(lastDismissed) < oneDay) return;
+          }
+          
+          this.installPrompt.style.display = 'block';
+        }
+        
+        hideInstallPrompt() {
+          this.installPrompt.style.display = 'none';
+        }
+        
+        async installPWA() {
+          if (!this.deferredPrompt) {
+            this.showFallbackInstructions();
+            return;
+          }
+          
+          this.deferredPrompt.prompt();
+          const { outcome } = await this.deferredPrompt.userChoice;
+          
+          console.log('User response to install prompt:', outcome);
+          
+          if (outcome === 'accepted') {
+            console.log('✅ Пользователь принял установку PWA');
+          } else {
+            console.log('❌ Пользователь отклонил установку PWA');
+          }
+          
+          this.deferredPrompt = null;
+          this.hideInstallPrompt();
+        }
+        
+        showFallbackInstructions() {
+          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+          const isAndroid = /Android/.test(navigator.userAgent);
+          
+          let message = '';
+          
+          if (isIOS) {
+            message = 'Для установки приложения:\n\n1. Нажмите кнопку "Поделиться" 📤\n2. Прокрутите меню вниз\n3. Выберите "На экран «Домой»"\n4. Подтвердите добавление';
+          } else if (isAndroid) {
+            message = 'Для установки приложения:\n\n1. Откройте меню браузера (три точки)\n2. Выберите "Добавить на главный экран"\n3. Подтвердите установку';
+          } else {
+            message = 'Для установки откройте меню браузера и выберите "Установить приложение" или "Добавить на главный экран".';
+          }
+          
+          alert(message);
+        }
+        
+        registerServiceWorker() {
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js')
+              .then((registration) => {
+                console.log('✅ Service Worker зарегистрирован');
+                
+                // Check for updates
+                registration.addEventListener('updatefound', () => {
+                  const newWorker = registration.installing;
+                  console.log('🔄 Обнаружено обновление Service Worker');
+                  
+                  newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                      console.log('🆕 Доступна новая версия приложения');
+                      if (confirm('Доступна новая версия приложения. Обновить?')) {
+                        window.location.reload();
+                      }
+                    }
+                  });
+                });
+              })
+              .catch((error) => {
+                console.error('❌ Ошибка регистрации Service Worker:', error);
+              });
+          }
+        }
+      }
+      
+      // Initialize everything when DOM is ready
+      document.addEventListener('DOMContentLoaded', () => {
+        optimizeFontLoading();
+        new PWAInstaller();
+      });
+
+      // Fallback for font loading
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          document.documentElement.classList.add('fonts-loaded');
+        }, 1000);
+      });
+    </script>
+  </body>
 </html>

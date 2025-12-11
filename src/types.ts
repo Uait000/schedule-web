@@ -1,13 +1,17 @@
+// src/types/types.ts
+
 export interface CommonLesson {
   name: string;
   teacher: string;
   room: string;
+  group?: string;
 }
 
 export interface SubgroupedLessonData {
   teacher: string;
   room: string;
   subgroup_index: number;
+  group?: string;
 }
 
 export interface SubgroupedLesson {
@@ -19,17 +23,17 @@ export interface Lesson {
   commonLesson?: CommonLesson;
   subgroupedLesson?: SubgroupedLesson;
   noLesson?: object; 
-  group?: string;
 }
 
 export interface Day {
-  lesson: Lesson[]; 
+  lessons: Lesson[];
 }
 
 export interface Schedule {
   weeks: {
     days: Day[];
   }[];
+  name?: string;
 }
 
 export interface Override {
@@ -42,4 +46,24 @@ export interface OverridesResponse {
   weekNum: number;
   weekDay: number;
   overrides: Override[];
+  day?: number;
+  month?: number;
+  year?: number;
+}
+
+export interface HistoryEntry extends OverridesResponse {
+  profileId: string;
+  timestamp: number;
+}
+
+// 🔥 ОБНОВЛЕННЫЙ ТИП: Добавил profileId
+export interface CustomCourse {
+  id: string;
+  profileId: string; // Привязка к конкретному профилю
+  name: string;
+  teacher: string;
+  room: string;
+  weekIndex: number;
+  dayIndex: number;
+  lessonIndex: number;
 }

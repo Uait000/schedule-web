@@ -1,5 +1,9 @@
+// src/components/ScheduleItem.tsx
+
 import { Lesson } from '../types';
 import '../App.css'; 
+import { dataStore } from '../utils/DataStore';
+import { getCurrentDayIndex } from '../utils/dateUtils';
 
 const LESSON_TIMES = [
   { start: '08:00', end: '09:30' },
@@ -19,13 +23,19 @@ const TUESDAY_SPECIAL_TIMES = [
 ];
 
 interface ScheduleItemProps {
-  lesson: Lesson;
+  lesson: Lesson | null;
   index: number;
   onClick: () => void;
   isCurrent?: boolean;
   isTuesday?: boolean;
   isClassHour?: boolean;
   hasNote?: boolean; 
+  isTeacherView?: boolean;
+  onSubgroupChange?: (lessonIndex: number, subgroup: number) => void;
+  savedSubgroup?: number;
+  customTime?: string;
+  customCourseId?: string;
+  activeDayIndex?: number;
 }
 
 const timeToMinutes = (time: string): number => {
@@ -33,15 +43,14 @@ const timeToMinutes = (time: string): number => {
   return hours * 60 + minutes;
 };
 
-export const isLessonCurrent = (lessonIndex: number, isTuesday: boolean = false): boolean => {
+export const isLessonCurrent = (lessonIndex: number, activeDayIndex: number, isTuesday: boolean = false): boolean => {
   const now = new Date();
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  const dayOfWeek = now.getDay(); 
+  const currentDayIndex = getCurrentDayIndex();
   
-  const currentDayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-  const isCurrentDay = isTuesday ? currentDayIndex === 1 : currentDayIndex !== 1;
-  
-  if (!isCurrentDay) return false; 
+  if (activeDayIndex !== currentDayIndex) {
+    return false;
+  }
   
   const times = isTuesday ? TUESDAY_SPECIAL_TIMES : LESSON_TIMES;
   const lessonTime = times[lessonIndex];
@@ -61,7 +70,47 @@ export const getLessonTime = (index: number, isTuesday: boolean = false): string
   return `${lessonTime.start}\n${lessonTime.end}`;
 };
 
-const LessonContent = ({ lesson, isClassHour }: { lesson: Lesson, isClassHour?: boolean }) => {
+// 🔥 ИСПРАВЛЕННАЯ ФУНКЦИЯ ДЛЯ ПРАВИЛЬНОГО ОТОБРАЖЕНИЯ НОМЕРА ПАРЫ
+const getDisplayIndex = (index: number, isTuesday: boolean, isClassHour: boolean): string => {
+  if (isClassHour) {
+    return ''; // Классный час без номера
+  }
+  
+  if (isTuesday) {
+    // 🔥 ИСПРАВЛЕНИЕ: Правильная нумерация для вторника
+    // index 0 → "1." (1 пара)
+    // index 1 → "2." (2 пара)  
+    // index 2 → "3." (3 пара)
+    // index 3 → классный час (без номера)
+    // index 4 → "4." (4 пара)
+    // index 5 → "5." (5 пара)
+    
+    if (index < 3) {
+      return `${index + 1}.`; // 0→1, 1→2, 2→3
+    } else {
+      return `${index}.`; // 4→4, 5→5
+    }
+  }
+  
+  return `${index + 1}.`; // Для остальных дней: 0→1, 1→2, 2→3, 3→4, 4→5
+};
+
+const LessonContent = ({ 
+  lesson, 
+  isClassHour, 
+  isTeacherView = false,
+}: { 
+  lesson: Lesson | null,
+  isClassHour?: boolean,
+  isTeacherView?: boolean,
+}) => {
+  if (!lesson) {
+    return (
+      <div className="lesson-content">
+        <span className="lesson-name">Нет данных</span>
+      </div>
+    );
+  }
   
   if (isClassHour) {
     return (
@@ -75,14 +124,23 @@ const LessonContent = ({ lesson, isClassHour }: { lesson: Lesson, isClassHour?: 
   }
 
   if (lesson.commonLesson) {
-    const { name, teacher, room } = lesson.commonLesson;
+    const { name, teacher, room, group } = lesson.commonLesson;
+    
     return (
       <div className="lesson-content">
         <span className="lesson-name">{name}</span>
         <span className="lesson-details">
-          {teacher}
-          <br />
-          Кабинет {room}
+          {isTeacherView ? (
+            <>
+              {group && <span>Группа: {group}<br /></span>}
+              {room && <span>Кабинет {room}</span>}
+            </>
+          ) : (
+            <>
+              {teacher && <span>{teacher}<br /></span>}
+              {room && <span>Кабинет {room}</span>}
+            </>
+          )}
         </span>
       </div>
     );
@@ -90,19 +148,29 @@ const LessonContent = ({ lesson, isClassHour }: { lesson: Lesson, isClassHour?: 
 
   if (lesson.subgroupedLesson) {
     const { name, subgroups } = lesson.subgroupedLesson;
+    
     return (
       <div className="lesson-content">
         <span className="lesson-name">{name}</span>
-        {subgroups.map((sub, i) => (
-          <div key={i} className="lesson-subgroup">
-            <span>{sub.subgroup_index || i + 1} п/г</span>
-            <span className="lesson-details">
-              {sub.teacher}
-              <br />
-              Кабинет {sub.room}
-            </span>
-          </div>
-        ))}
+        
+        <div className="subgroups-list" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+            {subgroups.map((subgroup, idx) => (
+                <div key={idx} className="lesson-details" style={{ lineHeight: '1.2' }}>
+                    <span style={{ fontWeight: 'bold', opacity: 0.8 }}>{idx + 1} п/г </span>
+                    {isTeacherView ? (
+                      <>
+                        {subgroup.group && <span>Гр. {subgroup.group} </span>}
+                        {subgroup.room && <span style={{ whiteSpace: 'nowrap' }}> | Каб. {subgroup.room}</span>}
+                      </>
+                    ) : (
+                      <>
+                        {subgroup.teacher && <span>{subgroup.teacher} </span>}
+                        {subgroup.room && <span style={{ whiteSpace: 'nowrap' }}> | Каб. {subgroup.room}</span>}
+                      </>
+                    )}
+                </div>
+            ))}
+        </div>
       </div>
     );
   }
@@ -131,20 +199,42 @@ export default function ScheduleItem({
   index, 
   onClick, 
   isCurrent = false, 
-  isTuesday = false,
+  isTuesday = false, 
   isClassHour = false,
-  hasNote = false 
+  hasNote = false,
+  isTeacherView = false,
+  customTime,
+  customCourseId,
+  activeDayIndex = 0
 }: ScheduleItemProps) {
-  const time = getLessonTime(index, isTuesday);
   
-  const isEmpty = !isClassHour && (lesson.noLesson || !lesson.commonLesson && !lesson.subgroupedLesson);
+  const time = customTime ? customTime.replace('-', '\n') : getLessonTime(index, isTuesday);
+  
+  const isEmpty = !isClassHour && (!lesson || lesson.noLesson || (!lesson.commonLesson && !lesson.subgroupedLesson));
+
+  // 🔥 ПРАВИЛЬНОЕ ОПРЕДЕЛЕНИЕ ТЕКУЩЕЙ ПАРЫ
+  const isReallyCurrent = isLessonCurrent(index, activeDayIndex, isTuesday);
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation(); 
+    if (customCourseId && window.confirm('Удалить этот курс?')) {
+      dataStore.removeCustomCourse(customCourseId);
+    }
+  };
+  
+  // 🔥 ПРАВИЛЬНЫЙ НОМЕР ДЛЯ ОТОБРАЖЕНИЯ
+  const displayIndex = getDisplayIndex(index, isTuesday, isClassHour);
   
   if (isClassHour) {
     return (
-      <div className={`lesson-card class-hour ${isCurrent ? 'current-lesson' : ''}`}>
-        <span className="lesson-index"></span>
+      <div className={`lesson-card class-hour ${isReallyCurrent ? 'current-lesson' : ''}`}>
+        <span className="lesson-index">{displayIndex}</span>
         
-        <LessonContent lesson={lesson} isClassHour={true} />
+        <LessonContent 
+          lesson={lesson} 
+          isClassHour={true} 
+          isTeacherView={isTeacherView}
+        />
 
         <div className="lesson-time-with-icon">
           <span className="lesson-time">{time}</span>
@@ -155,8 +245,8 @@ export default function ScheduleItem({
 
   if (isEmpty) {
     return (
-      <div className={`lesson-card empty ${isCurrent ? 'current-lesson' : ''}`}>
-        <span className="lesson-index">{index + 1}.</span>
+      <div className={`lesson-card empty ${isReallyCurrent ? 'current-lesson' : ''}`}>
+        <span className="lesson-index">{displayIndex}</span>
         
         <div className="lesson-content">
           <span className="lesson-name">Пары нет</span>
@@ -170,10 +260,37 @@ export default function ScheduleItem({
   }
 
   return (
-    <button className={`lesson-card clickable ${isCurrent ? 'current-lesson' : ''}`} onClick={onClick}>
-      <span className="lesson-index">{index + 1}.</span>
+    <button className={`lesson-card clickable ${isReallyCurrent ? 'current-lesson' : ''}`} onClick={onClick}>
+      <span className="lesson-index">{displayIndex}</span>
       
-      <LessonContent lesson={lesson} />
+      <LessonContent 
+        lesson={lesson} 
+        isTeacherView={isTeacherView}
+      />
+
+      {customCourseId && (
+        <div 
+          className="delete-course-btn" 
+          onClick={handleDelete}
+          style={{
+              position: 'absolute',
+              top: '10px',
+              right: '10px',
+              zIndex: 10,
+              background: 'rgba(255, 68, 68, 0.1)',
+              color: '#ff4444',
+              borderRadius: '8px',
+              padding: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: 'none',
+              cursor: 'pointer'
+          }}
+        >
+          <Icon name="close" style={{ fontSize: '18px' }} />
+        </div>
+      )}
 
       <div className="lesson-time-with-icon">
         <span className="lesson-time">{time}</span>
@@ -183,9 +300,11 @@ export default function ScheduleItem({
               <Icon name="sticky_note_2" style={{ fontSize: '18px' }} />
             </span>
           )}
-          <span className="edit-icon">
-            <Icon name="edit" style={{ fontSize: '18px' }} />
-          </span>
+          {!customCourseId && (
+              <span className="edit-icon">
+                <Icon name="edit" style={{ fontSize: '18px' }} />
+              </span>
+          )}
         </div>
       </div>
     </button>

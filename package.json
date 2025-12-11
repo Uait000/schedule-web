@@ -1,22 +1,24 @@
 {
-  "name": "vite-project",
+  "name": "schedule-ttgt",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "deploy:yandex": "chmod +x deploy-yandex.sh && ./deploy-yandex.sh",
-    "deploy:full": "npm run build && npm run deploy:yandex"
+    "deploy:yandex": "bash deploy-yandex.sh",
+    "deploy:yandex:win": "powershell -ExecutionPolicy Bypass -File deploy-yandex.ps1",
+    "clean": "rm -rf dist",
+    "build:clean": "npm run clean && npm run build",
+    "clear-cache": "node -e \"localStorage.clear(); console.log('🧹 Кэш очищен')\""
   },
   "dependencies": {
     "date-fns": "^4.1.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "react-router-dom": "^7.9.5",
-    "vite-plugin-pwa": "^1.1.0"
+    "react-router-dom": "^7.9.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
@@ -30,9 +32,10 @@
     "globals": "^16.4.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.45.0",
-    "vite": "npm:rolldown-vite@7.1.14"
+    "vite": "^7.2.4"
   },
-  "overrides": {
-    "vite": "npm:rolldown-vite@7.1.14"
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
   }
 }
