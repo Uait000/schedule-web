@@ -49,22 +49,16 @@ function saveToCache(key: string, data: any): void {
   }
 }
 
-// 🔥 УЛУЧШЕННАЯ ФУНКЦИЯ normalizeLesson ДЛЯ ОБРАБОТКИ NULL
 function normalizeLessonForApi(lesson: any): any {
-  console.log('🔧 normalizeLessonForApi input:', lesson);
-  
   if (lesson == null || lesson === 'null' || (typeof lesson === 'object' && Object.keys(lesson).length === 0)) {
     return { noLesson: {} };
   }
 
-  // 🔥 ИСПРАВЛЕНИЕ: Обрабатываем случай, когда willBe: null из API
   if (lesson === null) {
     return { noLesson: {} };
   }
 
-  // 🔥 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Если приходит объект с subgroup_index - это подгруппа
   if (lesson.subgroup_index !== undefined) {
-    console.log('🔧 Обнаружена отдельная подгруппа в API:', lesson);
     return {
       subgroupedLesson: {
         name: lesson.name || 'Информатика',
@@ -78,7 +72,6 @@ function normalizeLessonForApi(lesson: any): any {
     };
   }
 
-  // Вспомогательная функция для поиска группы
   const findGroupAnywhere = (obj: any): string | undefined => {
     if (!obj) return undefined;
     if (typeof obj === 'string') return obj; 
@@ -107,7 +100,7 @@ function normalizeLessonForApi(lesson: any): any {
   const common = lesson.CommonLesson || lesson.commonLesson;
   if (common) {
     const localGroup = findGroupAnywhere(common);
-    const result = {
+    return {
       commonLesson: {
         name: common.name || '',
         teacher: common.teacher || '',
@@ -115,13 +108,11 @@ function normalizeLessonForApi(lesson: any): any {
         group: localGroup || globalGroup 
       }
     };
-    console.log('🔧 Normalized common lesson in API:', result);
-    return result;
   }
 
   const subgrouped = lesson.SubgroupedLesson || lesson.subgroupedLesson;
   if (subgrouped) {
-    const result = {
+    return {
       subgroupedLesson: {
         name: subgrouped.name || '',
         subgroups: (subgrouped.subgroups || []).map((sub: any) => {
@@ -135,15 +126,9 @@ function normalizeLessonForApi(lesson: any): any {
         })
       }
     };
-    console.log('🔧 Normalized subgrouped lesson in API:', result);
-    return result;
   }
   
-  // 🔥 ДОБАВЛЕНО: Обработка прямых полей (как в вашем примере из API)
   if (lesson.name || lesson.teacher || lesson.room) {
-    console.log('🔧 Обнаружены прямые поля урока в API:', lesson);
-    
-    // Если есть subgroup_index - это подгруппа
     if (lesson.subgroup_index !== undefined) {
       return {
         subgroupedLesson: {
@@ -158,7 +143,6 @@ function normalizeLessonForApi(lesson: any): any {
       };
     }
     
-    // Иначе обычная пара
     return {
       commonLesson: {
         name: lesson.name || '',
@@ -170,22 +154,19 @@ function normalizeLessonForApi(lesson: any): any {
   }
   
   if (Object.keys(lesson).length === 0 || (lesson.noLesson)) {
-     return { noLesson: {} };
+      return { noLesson: {} };
   }
 
   if (globalGroup) {
     return { commonLesson: { name: '?', teacher: '?', room: '?', group: globalGroup } };
   }
   
-  console.log('🔧 Неизвестный формат урока в API, возвращаем noLesson');
   return { noLesson: {} };
 }
 
-// 🔥 УЛУЧШЕННАЯ ФУНКЦИЯ ДЛЯ ЗАПРОСОВ С ЛУЧШЕЙ ОБРАБОТКОЙ ОШИБОК
 async function fetchApi<T>(endpoint: string, useCache: boolean = true): Promise<T> {
   const cacheKey = `${CACHE_KEYS.SCHEDULE}_${endpoint.replace(/\//g, '_')}`;
 
-  // Пытаемся получить данные из кэша
   if (useCache) {
     const cachedData = getFromCache<T>(cacheKey);
     if (cachedData) {
@@ -209,7 +190,6 @@ async function fetchApi<T>(endpoint: string, useCache: boolean = true): Promise<
     clearTimeout(timeoutId);
     
     if (!response.ok) {
-      // 🔥 УЛУЧШЕННАЯ ОБРАБОТКА ОШИБОК
       if (response.status === 500) {
         throw new Error(`Ошибка сервера (500): Сервер временно недоступен`);
       } else if (response.status === 404) {
@@ -220,9 +200,7 @@ async function fetchApi<T>(endpoint: string, useCache: boolean = true): Promise<
     }
     
     const data = await response.json();
-    console.log(`✅ API Response from ${endpoint}:`, data);
     
-    // 🔥 ИСПРАВЛЕНИЕ: Нормализуем данные замен, обрабатывая willBe: null
     if (data.overrides && Array.isArray(data.overrides)) {
       data.overrides = data.overrides.map((override: any) => ({
         ...override,
@@ -231,21 +209,18 @@ async function fetchApi<T>(endpoint: string, useCache: boolean = true): Promise<
       }));
     }
     
-    // Сохраняем в кэш
     saveToCache(cacheKey, data);
     
     return data;
   } catch (error) {
     console.error(`❌ API Error at ${endpoint}:`, error);
     
-    // 🔥 УЛУЧШЕННАЯ ЛОГИКА ВОССТАНОВЛЕНИЯ
     const cachedData = getFromCache<T>(cacheKey);
     if (cachedData) {
       console.log(`🔄 Используем устаревший кэш для ${endpoint}`);
       return cachedData;
     }
     
-    // 🔥 ПРОПАГАЦИЯ ЧИТАЕМЫХ ОШИБОК
     if (error instanceof Error) {
       if (error.name === 'AbortError') {
         throw new Error('Превышено время ожидания ответа от сервера');
@@ -259,48 +234,73 @@ async function fetchApi<T>(endpoint: string, useCache: boolean = true): Promise<
 
 // API методы
 export const scheduleApi = {
-  // Получить список групп и преподавателей
   getItems: () => fetchApi<any>('/schedule/items'),
 
-  // Получить расписание для группы/преподавателя
   getSchedule: (itemName: string) => fetchApi<any>(`/schedule/${encodeURIComponent(itemName)}/schedule`),
 
-  // 🔥 ИСПРАВЛЕНИЕ: Разные endpoints для групп и преподавателей
-  getOverrides: (itemName: string) => {
-    // Определяем тип (преподаватель или группа)
+  // 🔥 ОБНОВЛЕНО: Поддержка параметра date
+  getOverrides: (itemName: string, date?: string) => {
     const isTeacher = itemName.includes('.');
+    const query = date ? `?date=${date}` : '';
+    
     if (isTeacher) {
-      // Для преподавателей используем специальный endpoint
-      return fetchApi<any>(`/schedule/teacher-overrides/${encodeURIComponent(itemName)}`);
+      return fetchApi<any>(`/schedule/teacher-overrides/${encodeURIComponent(itemName)}${query}`);
     } else {
-      // Для групп используем обычный endpoint
-      return fetchApi<any>(`/schedule/${encodeURIComponent(itemName)}/overrides`);
+      return fetchApi<any>(`/schedule/${encodeURIComponent(itemName)}/overrides${query}`);
     }
   },
 
-  // Принудительно обновить данные (без кэша)
   refreshSchedule: (itemName: string) => fetchApi<any>(`/schedule/${encodeURIComponent(itemName)}/schedule`, false),
-  refreshOverrides: (itemName: string) => {
+  
+  refreshOverrides: (itemName: string, date?: string) => {
     const isTeacher = itemName.includes('.');
+    const query = date ? `?date=${date}` : '';
     if (isTeacher) {
-      return fetchApi<any>(`/schedule/teacher-overrides/${encodeURIComponent(itemName)}`, false);
+      return fetchApi<any>(`/schedule/teacher-overrides/${encodeURIComponent(itemName)}${query}`, false);
     } else {
-      return fetchApi<any>(`/schedule/${encodeURIComponent(itemName)}/overrides`, false);
+      return fetchApi<any>(`/schedule/${encodeURIComponent(itemName)}/overrides${query}`, false);
     }
   },
 };
 
-// 🔥 ПРОСТАЯ ФУНКЦИЯ ДЛЯ ОБРАТНОЙ СОВМЕСТИМОСТИ
+// 🔥 УЛУЧШЕННАЯ ФУНКЦИЯ fetchData
 export async function fetchData(endpoint: string): Promise<any> {
-  // 🔥 ИСПРАВЛЕНИЕ: Определяем тип запроса
-  if (endpoint.includes('/overrides')) {
-    const itemName = endpoint.replace('/overrides', '');
-    return scheduleApi.getOverrides(itemName);
-  } else if (endpoint.includes('/schedule')) {
-    const itemName = endpoint.replace('/schedule', '');
+  // 1. Отделяем путь от параметров запроса (если есть ?date=...)
+  const [path, query] = endpoint.split('?');
+  const queryParams = query ? `?${query}` : '';
+
+  // 2. Обработка /items
+  if (path === '/items' || path === 'items') {
+    return scheduleApi.getItems();
+  }
+
+  // 3. Парсинг пути: /{item_name}/{type}
+  // Убираем начальный слеш
+  const cleanPath = path.startsWith('/') ? path.substring(1) : path;
+  const parts = cleanPath.split('/');
+
+  if (parts.length !== 2) {
+    // Если формат непонятный, пробуем как getSchedule
+    return scheduleApi.getSchedule(path.replace('/', ''));
+  }
+
+  const itemName = decodeURIComponent(parts[0]);
+  const endpointType = parts[1];
+
+  if (endpointType === 'schedule') {
     return scheduleApi.getSchedule(itemName);
+  } else if (endpointType === 'overrides') {
+    // Извлекаем дату из queryParams, если она там есть
+    let dateParam: string | undefined = undefined;
+    if (query) {
+      const urlParams = new URLSearchParams(query);
+      const date = urlParams.get('date');
+      if (date) dateParam = date;
+    }
+    return scheduleApi.getOverrides(itemName, dateParam);
   } else {
-    return scheduleApi.getSchedule(endpoint.replace('/', ''));
+    // Fallback
+    return scheduleApi.getSchedule(itemName);
   }
 }
 

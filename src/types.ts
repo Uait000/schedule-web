@@ -1,4 +1,4 @@
-// src/types/types.ts
+// src/types.ts
 
 export interface CommonLesson {
   name: string;
@@ -49,6 +49,7 @@ export interface OverridesResponse {
   day?: number;
   month?: number;
   year?: number;
+  isPractice?: boolean; // 🔥 ДОБАВЛЕНО
 }
 
 export interface HistoryEntry extends OverridesResponse {
@@ -56,10 +57,9 @@ export interface HistoryEntry extends OverridesResponse {
   timestamp: number;
 }
 
-// 🔥 ОБНОВЛЕННЫЙ ТИП: Добавил profileId
 export interface CustomCourse {
   id: string;
-  profileId: string; // Привязка к конкретному профилю
+  profileId: string;
   name: string;
   teacher: string;
   room: string;

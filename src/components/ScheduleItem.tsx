@@ -70,29 +70,34 @@ export const getLessonTime = (index: number, isTuesday: boolean = false): string
   return `${lessonTime.start}\n${lessonTime.end}`;
 };
 
-// 🔥 ИСПРАВЛЕННАЯ ФУНКЦИЯ ДЛЯ ПРАВИЛЬНОГО ОТОБРАЖЕНИЯ НОМЕРА ПАРЫ
 const getDisplayIndex = (index: number, isTuesday: boolean, isClassHour: boolean): string => {
   if (isClassHour) {
-    return ''; // Классный час без номера
+    return ''; 
   }
   
   if (isTuesday) {
-    // 🔥 ИСПРАВЛЕНИЕ: Правильная нумерация для вторника
-    // index 0 → "1." (1 пара)
-    // index 1 → "2." (2 пара)  
-    // index 2 → "3." (3 пара)
-    // index 3 → классный час (без номера)
-    // index 4 → "4." (4 пара)
-    // index 5 → "5." (5 пара)
-    
     if (index < 3) {
-      return `${index + 1}.`; // 0→1, 1→2, 2→3
+      return `${index + 1}.`;
     } else {
-      return `${index}.`; // 4→4, 5→5
+      return `${index}.`;
     }
   }
   
-  return `${index + 1}.`; // Для остальных дней: 0→1, 1→2, 2→3, 3→4, 4→5
+  return `${index + 1}.`;
+};
+
+// 🔥 ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ ОТОБРАЖЕНИЯ КАБИНЕТА
+const RoomDisplay = ({ room }: { room: string }) => {
+  if (!room || room.trim() === '' || room.trim() === '-' || room.trim() === '–') {
+    return null;
+  }
+  
+  // Если в поле room написано "ПРАКТИКА" или что-то длинное, не пишем слово "Кабинет"
+  if (room.length > 5 || room.toLowerCase().includes('практика')) {
+     return <span>{room}</span>;
+  }
+
+  return <span>Кабинет {room}</span>;
 };
 
 const LessonContent = ({ 
@@ -126,19 +131,22 @@ const LessonContent = ({
   if (lesson.commonLesson) {
     const { name, teacher, room, group } = lesson.commonLesson;
     
+    // 🔥 ПРОВЕРКА НА ПРАКТИКУ ДЛЯ СТИЛИЗАЦИИ
+    const isPractice = name.toLowerCase().includes('практика') || name.toLowerCase().includes('аттестация') || name.toLowerCase().includes('гиа');
+
     return (
-      <div className="lesson-content">
+      <div className={`lesson-content ${isPractice ? 'practice-lesson' : ''}`}>
         <span className="lesson-name">{name}</span>
         <span className="lesson-details">
           {isTeacherView ? (
             <>
               {group && <span>Группа: {group}<br /></span>}
-              {room && <span>Кабинет {room}</span>}
+              <RoomDisplay room={room} />
             </>
           ) : (
             <>
               {teacher && <span>{teacher}<br /></span>}
-              {room && <span>Кабинет {room}</span>}
+              <RoomDisplay room={room} />
             </>
           )}
         </span>
@@ -160,12 +168,12 @@ const LessonContent = ({
                     {isTeacherView ? (
                       <>
                         {subgroup.group && <span>Гр. {subgroup.group} </span>}
-                        {subgroup.room && <span style={{ whiteSpace: 'nowrap' }}> | Каб. {subgroup.room}</span>}
+                        {subgroup.room && <span style={{ whiteSpace: 'nowrap' }}> | <RoomDisplay room={subgroup.room} /></span>}
                       </>
                     ) : (
                       <>
                         {subgroup.teacher && <span>{subgroup.teacher} </span>}
-                        {subgroup.room && <span style={{ whiteSpace: 'nowrap' }}> | Каб. {subgroup.room}</span>}
+                        {subgroup.room && <span style={{ whiteSpace: 'nowrap' }}> | <RoomDisplay room={subgroup.room} /></span>}
                       </>
                     )}
                 </div>
@@ -212,7 +220,6 @@ export default function ScheduleItem({
   
   const isEmpty = !isClassHour && (!lesson || lesson.noLesson || (!lesson.commonLesson && !lesson.subgroupedLesson));
 
-  // 🔥 ПРАВИЛЬНОЕ ОПРЕДЕЛЕНИЕ ТЕКУЩЕЙ ПАРЫ
   const isReallyCurrent = isLessonCurrent(index, activeDayIndex, isTuesday);
 
   const handleDelete = (e: React.MouseEvent) => {
@@ -222,9 +229,19 @@ export default function ScheduleItem({
     }
   };
   
-  // 🔥 ПРАВИЛЬНЫЙ НОМЕР ДЛЯ ОТОБРАЖЕНИЯ
   const displayIndex = getDisplayIndex(index, isTuesday, isClassHour);
   
+  // 🔥 ОПРЕДЕЛЯЕМ, ПРАКТИКА ЛИ ЭТО, ЧТОБЫ ДОБАВИТЬ СПЕЦИАЛЬНЫЙ КЛАСС
+  // Теперь проверяем и commonLesson, и subgroupedLesson (на всякий случай)
+  let isPractice = false;
+  if (lesson) {
+      const name = lesson.commonLesson?.name || lesson.subgroupedLesson?.name || '';
+      isPractice = name.toLowerCase().includes('практика') || 
+                   name.toLowerCase().includes('гиа') || 
+                   name.toLowerCase().includes('каникулы') ||
+                   name.toLowerCase().includes('аттестация');
+  }
+
   if (isClassHour) {
     return (
       <div className={`lesson-card class-hour ${isReallyCurrent ? 'current-lesson' : ''}`}>
@@ -260,7 +277,15 @@ export default function ScheduleItem({
   }
 
   return (
-    <button className={`lesson-card clickable ${isReallyCurrent ? 'current-lesson' : ''}`} onClick={onClick}>
+    <button 
+        className={`lesson-card clickable ${isReallyCurrent ? 'current-lesson' : ''} ${isPractice ? 'practice-card' : ''}`} 
+        onClick={onClick}
+
+        style={isPractice ? { 
+            borderLeft: '4px solid #7f5df8ff', 
+            backgroundColor: 'var(--color-surface-container-high)' 
+        } : {}}
+    >
       <span className="lesson-index">{displayIndex}</span>
       
       <LessonContent 
