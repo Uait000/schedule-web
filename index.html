@@ -2,33 +2,31 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
+    
+    <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" type="image/svg+xml" href="/react.svg" />
+    <link rel="icon" type="image/png" href="/icon-192x192.png" />
+    
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Расписание ТТЖТ</title>
     <meta name="description" content="Расписание занятий для студентов и преподавателей ТТЖТ">
     
-    <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json" crossorigin="use-credentials">
     
-    <!-- Theme Color -->
     <meta name="theme-color" content="#1976d2" />
     <meta name="msapplication-TileColor" content="#1976d2">
     
-    <!-- Modern PWA meta tags -->
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Расписание ТТЖТ">
     
-    <!-- Apple Touch Icons -->
     <link rel="apple-touch-icon" href="/icon-192x192.png">
     
-    <!-- Material Icons with optimized preload -->
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preload" href="https://fonts.gstatic.com/s/materialicons/v140/flUhRq6tzZclQEJ-Vdg-IuiaDsNc.woff2" as="font" type="font/woff2" crossorigin="anonymous" onload="this.onload=null;this.rel='font-preload'">
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons&display=block" rel="stylesheet" media="print" onload="this.media='all'">
     
-    <!-- Preload critical resources -->
     <link rel="preconnect" href="https://ttgt-api-isxb.onrender.com">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     
@@ -118,7 +116,6 @@
   <body>
     <div id="root"></div>
     
-    <!-- Install Prompt -->
     <div id="install-prompt" class="install-prompt" style="display: none;">
       <div style="font-size: 48px; margin-bottom: 8px;">📱</div>
       <p style="margin: 0 0 12px 0; font-weight: 600; font-size: 16px;">Установить приложение?</p>
@@ -131,11 +128,9 @@
     
     <script type="module" src="/src/main.tsx"></script>
     
-    <!-- PWA Installation Logic -->
     <script>
       // Font loading optimization
       function optimizeFontLoading() {
-        // Check if Material Icons font is loaded
         if (document.fonts) {
           document.fonts.load('1em Material Icons').then(() => {
             document.documentElement.classList.add('fonts-loaded');
@@ -144,7 +139,6 @@
           });
         }
 
-        // Remove preload link after font is used to avoid warnings
         const preloadLink = document.querySelector('link[as="font"]');
         if (preloadLink) {
           setTimeout(() => {
@@ -172,7 +166,6 @@
         }
 
         checkPWAStatus() {
-          // Check if app is running as PWA
           const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
           const isIOSStandalone = navigator.standalone;
           
@@ -183,19 +176,16 @@
         }
         
         setupEventListeners() {
-          // BeforeInstallPrompt event
           window.addEventListener('beforeinstallprompt', (e) => {
             console.log('📲 BeforeInstallPrompt event fired');
             e.preventDefault();
             this.deferredPrompt = e;
             
-            // Show prompt after 5 seconds
             setTimeout(() => {
               this.showInstallPrompt();
             }, 5000);
           });
           
-          // App installed event
           window.addEventListener('appinstalled', (e) => {
             console.log('✅ PWA установлено успешно');
             this.hideInstallPrompt();
@@ -203,12 +193,10 @@
             localStorage.setItem('pwaInstalled', 'true');
           });
           
-          // Install button
           this.installButton.addEventListener('click', () => {
             this.installPWA();
           });
           
-          // Cancel button
           this.cancelButton.addEventListener('click', () => {
             this.hideInstallPrompt();
             localStorage.setItem('installPromptDismissed', Date.now().toString());
@@ -275,7 +263,6 @@
               .then((registration) => {
                 console.log('✅ Service Worker зарегистрирован');
                 
-                // Check for updates
                 registration.addEventListener('updatefound', () => {
                   const newWorker = registration.installing;
                   console.log('🔄 Обнаружено обновление Service Worker');
@@ -297,13 +284,11 @@
         }
       }
       
-      // Initialize everything when DOM is ready
       document.addEventListener('DOMContentLoaded', () => {
         optimizeFontLoading();
         new PWAInstaller();
       });
 
-      // Fallback for font loading
       window.addEventListener('load', () => {
         setTimeout(() => {
           document.documentElement.classList.add('fonts-loaded');

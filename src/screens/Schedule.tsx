@@ -554,7 +554,7 @@ export function ScheduleScreen() {
         setOverrides(cachedProfile.overrides || null);
         
         scheduleApi.refreshOverrides(profileId, formattedDate).then(newOverrides => {
-             if (newOverrides) setOverrides(newOverrides);
+              if (newOverrides) setOverrides(newOverrides);
         }).catch(console.error);
         
         setIsLoading(false);
@@ -962,9 +962,16 @@ export function ScheduleScreen() {
   const lessonToEdit = (lessonsToShow && editingLessonIndex !== null) ? lessonsToShow[editingLessonIndex] : null;
   const currentLessonData = editingLessonIndex !== null ? getSavedLessonData(currentProfileId, activeWeekIndex, activeDayIndex, editingLessonIndex) : { notes: '', subgroup: 0 };
 
+  // Вычисляем реальную текущую неделю для сравнения
+  const realCurrentDate = new Date();
+  const realCurrentWeek = getWeekNumber(realCurrentDate);
+  // Если activeWeekIndex отличается от реальной недели, значит мы смотрим "Следующую" (или другую) неделю
+  const isWeekCurrent = activeWeekIndex === realCurrentWeek;
+
   return (
     <>
-      <style>{` @import url('https://fonts.googleapis.com/css2?family=Material+Icons&display=swap'); `}</style>
+      {/* 🔥 ИСПРАВЛЕНО: display=block для предотвращения мигания текста */}
+      <style>{` @import url('https://fonts.googleapis.com/css2?family=Material+Icons&display=block'); `}</style>
       <div className="container">
         <div className="schedule-header">
           <h2 className="schedule-title">Расписание</h2>
@@ -1002,11 +1009,17 @@ export function ScheduleScreen() {
         <div className="week-switcher-container">
           <button className="back-button" onClick={() => navigate('/')} title="Назад"><Icon name="arrow_back" /></button>
           
-          {/* 🔥 ИСПРАВЛЕННАЯ КНОПКА: Теперь вызывает функцию handleWeekSwitch */}
+          {/* 🔥 ИСПРАВЛЕННАЯ ЛОГИКА ОТОБРАЖЕНИЯ (Текущая / Следующая) */}
           <button className="week-switcher-button" onClick={handleWeekSwitch}>
             <div className="week-text">
               <span className="week-name">{activeWeekIndex === 0 ? 'Первая' : 'Вторая'} неделя</span>
-              {activeWeekIndex === getWeekNumber(new Date()) && <span className="week-current"><Icon name="schedule" style={{ fontSize: '14px' }} /> Текущая</span>}
+              {isWeekCurrent ? (
+                <span className="week-current"><Icon name="schedule" style={{ fontSize: '14px' }} /> Текущая</span>
+              ) : (
+                <span className="week-current" style={{ color: 'var(--color-primary)', backgroundColor: 'var(--color-surface-variant)' }}>
+                  <Icon name="next_plan" style={{ fontSize: '14px' }} /> Следующая
+                </span>
+              )}
             </div>
           </button>
           
