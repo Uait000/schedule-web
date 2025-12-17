@@ -9,7 +9,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'https://ttgt-api-isxb.onrender.com',
+        target: 'https://tih-ttgt.ru',
         changeOrigin: true,
         secure: false,
       }
