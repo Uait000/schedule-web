@@ -175,12 +175,14 @@ async function fetchApi<T>(endpoint: string, useCache: boolean = true): Promise<
   }
 
   try {
-    console.log(`🔄 API Request: ${API_BASE_URL}${endpoint}`);
+    // 🔥 Ensure endpoint starts with /
+    const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    console.log(`🔄 API Request: ${API_BASE_URL}${normalizedEndpoint}`);
     
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
     
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const response = await fetch(`${API_BASE_URL}${normalizedEndpoint}`, {
       signal: controller.signal,
       headers: {
         'Accept': 'application/json',

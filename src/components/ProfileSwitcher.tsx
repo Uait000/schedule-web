@@ -37,7 +37,7 @@ export function ProfileSwitcher({
   console.log('🎯 ProfileSwitcher: текущий профиль', currentProfile);
   console.log('🔄 ProfileSwitcher: может переключаться?', hasStudent && hasTeacher);
 
-  // Если есть оба профиля - показываем переключатель
+  // СЦЕНАРИЙ 1: ЕСТЬ ОБА ПРОФИЛЯ (Показываем кнопку переключения)
   if (hasStudent && hasTeacher) {
     const handleSwitch = () => {
       if (isRotating || isLoading) return;
@@ -67,6 +67,7 @@ export function ProfileSwitcher({
     return (
       <div className="profile-switcher-container">
         <button 
+          id="tour-profile-icon" // 👈 ID для гайда (кнопка переключения)
           className={`profile-switcher ${isRotating ? 'rotating' : ''} ${isLoading ? 'loading' : ''}`}
           onClick={handleSwitch}
           title={`Переключиться на ${targetProfile?.name || 'другой профиль'}`}
@@ -88,10 +89,13 @@ export function ProfileSwitcher({
     );
   }
 
-  // Если только один профиль или нет профилей
+  // СЦЕНАРИЙ 2: ОДИН ПРОФИЛЬ ИЛИ НЕТ ВООБЩЕ
   return (
     <div className="profile-info-only">
-      <div className="profile-icon">
+      <div 
+        id="tour-profile-icon" // 👈 ID для гайда (статичная иконка)
+        className="profile-icon"
+      >
         <span className="material-icons">
           {!hasStudent && !hasTeacher ? 'person' : 
            currentProfileType === ProfileType.TEACHER ? 'person' : 'school'}
@@ -115,6 +119,7 @@ export function ProfileSwitcher({
       </div>
 
       <button 
+        id="tour-add-profile" // 👈 ID для гайда (кнопка добавления)
         className="add-profile-button"
         onClick={onAddProfile}
         disabled={isLoading}

@@ -15,6 +15,7 @@ import { getDayIndex, getWeekNumber } from '../utils/dateUtils';
 import { useHistoryStorage } from '../hooks/useHistoryStorage';
 import { HistoryModal } from '../components/HistoryModal';
 import { dataStore } from '../utils/DataStore';
+import { useAppTour } from '../hooks/useAppTour';
 
 interface LessonData {
   notes: string;
@@ -22,7 +23,6 @@ interface LessonData {
   lastUpdated?: number;
 }
 
-// 🔥 ИСПРАВЛЕНО: Убрана Суббота, теперь только 5 дней
 const DAYS_OF_WEEK = [ 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница' ];
 
 function findGroupAnywhere(obj: any): string | undefined {
@@ -326,7 +326,16 @@ function CustomCalendar({ isOpen, onClose, onSelectDate, currentDate }: { isOpen
   ); 
 }
 
-function DropdownMenu({ isOpen, onClose, onCheckOverrides, onOpenHistory, onAddCourse, onOpenNotes, onInstallApp }: { 
+function DropdownMenu({ 
+  isOpen, 
+  onClose, 
+  onCheckOverrides, 
+  onOpenHistory, 
+  onAddCourse, 
+  onOpenNotes, 
+  onInstallApp,
+  onStartTour // 🔥 Новый проп для запуска тура
+}: { 
   isOpen: boolean; 
   onClose: () => void; 
   onCheckOverrides: () => void; 
@@ -334,12 +343,17 @@ function DropdownMenu({ isOpen, onClose, onCheckOverrides, onOpenHistory, onAddC
   onAddCourse: () => void; 
   onOpenNotes: () => void;
   onInstallApp: () => void;
+  onStartTour: () => void;
 }) { 
   const navigate = useNavigate(); 
+  
   if (!isOpen) return null; 
   
   const handleMenuClick = (action: string) => { 
-    onClose(); 
+    // Не закрываем меню сразу для помощи, чтобы тур мог его корректно обработать,
+    // но в нашей логике тура мы сами управляем закрытием, так что ок.
+    if (action !== 'help') onClose();
+    
     if (action === 'overrides') { onCheckOverrides(); } 
     else if (action === 'history') { onOpenHistory(); } 
     else if (action === 'addCourse') { onAddCourse(); } 
@@ -350,18 +364,21 @@ function DropdownMenu({ isOpen, onClose, onCheckOverrides, onOpenHistory, onAddC
       localStorage.removeItem('userType'); 
       navigate('/', { replace: true }); 
     } else if (action === 'feedback') { window.open('https://t.me/ttgt1bot', '_blank'); } 
+    else if (action === 'help') { onStartTour(); } // 🔥 Запуск тура
   }; 
   
   return ( 
     <div className="dropdown-backdrop" onClick={onClose}> 
       <div className="dropdown-menu" onClick={(e) => e.stopPropagation()}> 
-        <button className="dropdown-item" onClick={() => handleMenuClick('overrides')}><Icon name="sync_alt" /><span>Проверить изменения</span></button> 
-        <button className="dropdown-item" onClick={() => handleMenuClick('history')}><Icon name="history" /><span>История замен</span></button> 
-        <button className="dropdown-item" onClick={() => handleMenuClick('notes')}><Icon name="description" /><span>Мои заметки</span></button> 
-        <button className="dropdown-item" onClick={() => handleMenuClick('addCourse')}><Icon name="add_circle" /><span>Добавить курс</span></button> 
-        <button className="dropdown-item" onClick={() => handleMenuClick('install')}><Icon name="download" /><span>Установить приложение</span></button> 
-        <button className="dropdown-item" onClick={() => handleMenuClick('changeGroup')}><Icon name="group" /><span>Поменять группу</span></button> 
-        <button className="dropdown-item" onClick={() => handleMenuClick('feedback')}><Icon name="feedback" /><span>Обратная связь</span></button> 
+        <button id="menu-item-overrides" className="dropdown-item" onClick={() => handleMenuClick('overrides')}><Icon name="sync_alt" /><span>Проверить изменения</span></button> 
+        <button id="menu-item-history" className="dropdown-item" onClick={() => handleMenuClick('history')}><Icon name="history" /><span>История замен</span></button> 
+        <button id="menu-item-notes" className="dropdown-item" onClick={() => handleMenuClick('notes')}><Icon name="description" /><span>Мои заметки</span></button> 
+        <button id="menu-item-add-course" className="dropdown-item" onClick={() => handleMenuClick('addCourse')}><Icon name="add_circle" /><span>Добавить курс</span></button> 
+        <button id="menu-item-install" className="dropdown-item" onClick={() => handleMenuClick('install')}><Icon name="download" /><span>Установить приложение</span></button> 
+        <button id="menu-item-change-group" className="dropdown-item" onClick={() => handleMenuClick('changeGroup')}><Icon name="group" /><span>Поменять группу</span></button> 
+        {/* 🔥 Кнопка запуска тура */}
+        <button id="menu-item-help" className="dropdown-item" onClick={() => handleMenuClick('help')}><Icon name="help_outline" /><span>Как пользоваться?</span></button>
+        <button id="menu-item-feedback" className="dropdown-item" onClick={() => handleMenuClick('feedback')}><Icon name="feedback" /><span>Обратная связь</span></button> 
       </div> 
     </div> 
   ); 
@@ -456,7 +473,10 @@ export function ScheduleScreen() {
   const [editingLessonIndex, setEditingLessonIndex] = useState<number | null>(null);
   const [dataVersion, setDataVersion] = useState(0);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  
+  // 🔥 Управление состоянием меню теперь здесь (и передается в хук)
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
   const [isAddCourseOpen, setIsAddCourseOpen] = useState(false);
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
   const [isCheckingOverrides, setIsCheckingOverrides] = useState(false);
@@ -475,6 +495,12 @@ export function ScheduleScreen() {
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
   const [swipeLimitReached, setSwipeLimitReached] = useState(false);
+
+  // 👇 Инициализация тура. Передаем setIsMenuOpen, чтобы тур мог сам открывать меню
+  const { startTour } = useAppTour({
+    isReady: !isLoading && !!fullSchedule,
+    setIsMenuOpen
+  });
 
   const dateKey = format(selectedDate, 'yyyy-MM-dd');
 
@@ -649,15 +675,15 @@ export function ScheduleScreen() {
       scheduleApi.refreshOverrides(selectedId, dateKey)
         .then(newOverrides => {
             if (newOverrides) {
-                 const normalized = {
+                  const normalized = {
                     ...newOverrides,
                     overrides: (newOverrides.overrides || []).map((o: any) => ({
                         ...o,
                         shouldBe: normalizeLesson(o.shouldBe),
                         willBe: normalizeLesson(o.willBe)
                     }))
-                 };
-                 setOverrides(normalized);
+                  };
+                  setOverrides(normalized);
             }
         })
         .catch(console.error);
@@ -975,11 +1001,17 @@ export function ScheduleScreen() {
       <div className="container">
         <div className="schedule-header">
           <h2 className="schedule-title">Расписание</h2>
-          <button className="menu-button" onClick={() => setIsMenuOpen(true)}><Icon name="more_vert" /></button>
+          {/* 👇 Добавлен ID для тура */}
+          <button id="tour-menu" className="menu-button" onClick={() => setIsMenuOpen(true)}><Icon name="more_vert" /></button>
         </div>
-        <ProfileSwitcher key={appState.lastUsed} profiles={appState.profiles} currentProfileType={appState.lastUsed} onSwitch={handleProfileSwitch} onAddProfile={handleAddProfile} isLoading={isSwitchingProfile} />
         
-        <div className={`schedule-tabs-container ${swipeLimitReached ? 'limit-reached' : ''}`} ref={tabsContainerRef}>
+        {/* 👇 Обернуто в div с ID для тура */}
+        <div id="tour-profile">
+            <ProfileSwitcher key={appState.lastUsed} profiles={appState.profiles} currentProfileType={appState.lastUsed} onSwitch={handleProfileSwitch} onAddProfile={handleAddProfile} isLoading={isSwitchingProfile} />
+        </div>
+        
+        {/* 👇 Добавлен ID для тура */}
+        <div id="tour-days" className={`schedule-tabs-container ${swipeLimitReached ? 'limit-reached' : ''}`} ref={tabsContainerRef}>
           <div className="schedule-tabs" ref={tabsRef}>
             {DAYS_OF_WEEK.map((day, index) => (
               <button key={day} className={`tab-button ${activeDayIndex === index ? 'active' : ''} ${isAnimating ? 'no-transition' : ''} ${index === 5 && swipeLimitReached ? 'reached-limit' : ''}`} onClick={() => handleDayChange(index)} disabled={isAnimating || isSwitchingProfile}>
@@ -989,7 +1021,8 @@ export function ScheduleScreen() {
           </div>
         </div>
 
-        <div className="schedule-list" data-version={dataVersion} ref={scheduleListRef} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} style={{ touchAction: 'pan-y' }}>
+        {/* 👇 Добавлен ID для тура */}
+        <div id="tour-list" className="schedule-list" data-version={dataVersion} ref={scheduleListRef} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} style={{ touchAction: 'pan-y' }}>
           {isLoading && (<div className="loading-state"><div className="loading-spinner"></div><p>Загрузка расписания...</p></div>)}
           {error && (<div className="error-state"><Icon name="error" style={{ fontSize: '24px', marginBottom: '8px' }} /><p>{error}</p><button onClick={() => window.location.reload()} style={{ marginTop: '12px', padding: '8px 16px', backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Перезагрузить</button></div>)}
           
@@ -998,7 +1031,8 @@ export function ScheduleScreen() {
           {!error && (<div className="overrides-toggle-container" style={{ marginTop: '16px', marginBottom: '0' }}><button className={`overrides-toggle ${applyOverrides ? 'active' : ''}`} onClick={toggleApplyOverrides} disabled={isSwitchingProfile}><Icon name="swap_horiz" /><span>Учитывать замены</span>{applyOverrides && (overrides?.overrides?.length || 0) > 0 && (<span className="overrides-badge">{overrides!.overrides.length}</span>)}</button></div>)}
         </div>
         
-        <DropdownMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onCheckOverrides={checkOverrides} onOpenHistory={() => setIsHistoryOpen(true)} onOpenNotes={() => setIsNotesModalOpen(true)} onInstallApp={handleInstallApp} onAddCourse={() => { setIsMenuOpen(false); setIsAddCourseOpen(true); }} />
+        {/* 👇 Передаем метод startTour в меню */}
+        <DropdownMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onCheckOverrides={checkOverrides} onOpenHistory={() => setIsHistoryOpen(true)} onOpenNotes={() => setIsNotesModalOpen(true)} onInstallApp={handleInstallApp} onAddCourse={() => { setIsMenuOpen(false); setIsAddCourseOpen(true); }} onStartTour={startTour} />
         <AddCourseModal isOpen={isAddCourseOpen} onClose={() => setIsAddCourseOpen(false)} activeWeek={activeWeekIndex} activeDay={activeDayIndex} schedule={fullSchedule} overrides={applyOverrides ? overrides : null} profileId={currentProfileId} />
         <CustomCalendar isOpen={isCalendarOpen} onClose={() => setIsCalendarOpen(false)} onSelectDate={handleDateSelect} currentDate={selectedDate} />
         <NoteModal lesson={lessonToEdit} onClose={() => setEditingLessonIndex(null)} onSave={handleSaveNote} savedNote={currentLessonData.notes} savedSubgroup={currentLessonData.subgroup} />
@@ -1006,7 +1040,8 @@ export function ScheduleScreen() {
         <HistoryModal isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} history={history} isTeacherView={isTeacherView} />
         <AllNotesModal isOpen={isNotesModalOpen} onClose={() => setIsNotesModalOpen(false)} profileId={currentProfileId} schedule={fullSchedule} />
       
-        <div className="week-switcher-container">
+        {/* 👇 Добавлен ID для тура */}
+        <div id="tour-nav-panel" className="week-switcher-container">
           <button className="back-button" onClick={() => navigate('/')} title="Назад"><Icon name="arrow_back" /></button>
           
           {/* 🔥 ИСПРАВЛЕННАЯ ЛОГИКА ОТОБРАЖЕНИЯ (Текущая / Следующая) */}
