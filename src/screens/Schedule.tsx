@@ -547,7 +547,6 @@ export function ScheduleScreen() {
         if (cachedProfile?.overrides) setOverrides(cachedProfile.overrides);
         if (metadata.events) setCalendarEvents(metadata.events);
 
-        // 🔥 Исправление 500 ошибки: убираем "0" как значение хеша по умолчанию
         const response = await scheduleApi.getInfo(
             profileId, 
             formattedDate, 
@@ -718,7 +717,6 @@ export function ScheduleScreen() {
   useEffect(() => {
       if(!currentProfileId || !hasInitialized.current) return;
       const metadata = dataStore.getProfileMetadata(currentProfileId);
-      // 🔥 Передаем "" вместо "0", чтобы сервер не падал
       scheduleApi.getInfo(
           currentProfileId, 
           dateKey, 
@@ -855,26 +853,49 @@ export function ScheduleScreen() {
   const currentLessonData = editingLessonIndex !== null ? getSavedLessonData(currentProfileId, activeWeekIndex, activeDayIndex, editingLessonIndex) : { notes: '', subgroup: 0 };
   const isWeekCurrent = activeWeekIndex === getWeekNumber(new Date());
 
+  // 🔥 ОБНОВЛЕННАЯ ЛОГИКА БАННЕРА ДЛЯ ПРЕПОДАВАТЕЛЕЙ
   const practiceInfo = useMemo<PracticeInfo | null>(() => {
+    // 1. Получаем базовое событие (из календаря или уроков)
+    let info: PracticeInfo | null = null;
+    
     const upcomingHoliday = findUpcomingEvent(calendarEvents, selectedDate, 4);
-    if (upcomingHoliday) return upcomingHoliday;
-    if (overrides && (overrides.isPractice || overrides.practiceTitle)) {
+    if (upcomingHoliday) {
+        info = upcomingHoliday;
+    } else if (overrides && (overrides.isPractice || overrides.practiceTitle)) {
        const title = overrides.practiceTitle || "Событие";
        const code = overrides.practiceCode || "";
        let type: 'practice' | 'attestation' | 'holiday' | 'gia' | 'session' = 'practice';
+       
        if (code === '::' || title.toLowerCase().includes('аттестация')) type = 'attestation';
        else if (['III', 'D'].includes(code)) type = 'gia';
        else if (code === '=') type = 'holiday';
+
        const dateStart = overrides.dateStart ? parseISO(overrides.dateStart) : selectedDate;
        const dateEnd = overrides.dateEnd ? parseISO(overrides.dateEnd) : null;
        const returnDate = overrides.returnDate ? parseISO(overrides.returnDate) : null;
        const today = new Date();
        today.setHours(0, 0, 0, 0);
        const daysUntil = differenceInCalendarDays(dateStart, today);
-       return { name: title, type: type, dateStart: dateStart, dateEnd: dateEnd, returnDate: returnDate, daysUntil: daysUntil, isActive: daysUntil <= 0 };
+
+       info = { name: title, type: type, dateStart: dateStart, dateEnd: dateEnd, returnDate: returnDate, daysUntil: daysUntil, isActive: daysUntil <= 0 };
+    } else {
+       info = findNextPractice(displaySchedule, activeWeekIndex, selectedDate);
     }
-    return findNextPractice(displaySchedule, activeWeekIndex, selectedDate);
-  }, [calendarEvents, selectedDate.getTime(), overrides, displaySchedule, activeWeekIndex]);
+
+    // 🔥 ФИЛЬТРАЦИЯ: Если это преподаватель, показываем только разрешенные типы событий
+    if (isTeacherView && info) {
+        const nameLower = info.name.toLowerCase();
+        const isAllowed = 
+            nameLower.includes('промежуточная аттестация') || 
+            nameLower.includes('каникулы') || 
+            nameLower.includes('государственная итоговая аттестация') || 
+            nameLower.includes('подготовка к государственной итоговой аттестации');
+        
+        return isAllowed ? info : null;
+    }
+
+    return info;
+  }, [calendarEvents, selectedDate.getTime(), overrides, displaySchedule, activeWeekIndex, isTeacherView]);
 
   const handlePracticeClick = () => { if (practiceInfo) setIsPracticeModalOpen(true); };
 
