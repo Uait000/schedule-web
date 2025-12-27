@@ -1,13 +1,5 @@
 // src/api/api.ts
-
-const API_BASE_URL = 'http://127.0.0.1:8000';
-
-const CACHE_KEYS = {
-  SCHEDULE: 'api_cache_schedule',
-  OVERRIDES: 'api_cache_overrides',
-  EVENTS: 'api_cache_events',
-  ITEMS: 'api_cache_items'
-};
+const API_BASE_URL = 'https://tih-ttgt.ru';
 
 const CACHE_DURATION = 5 * 60 * 1000;
 
@@ -30,9 +22,14 @@ function saveToCache(key: string, data: any): void {
   } catch (e) { console.error(e); }
 }
 
-function normalizeLessonForApi(lesson: any): any {
-  if (!lesson || lesson === 'null' || Object.keys(lesson).length === 0) return { noLesson: {} };
+export function normalizeLessonForApi(lesson: any): any {
+  if (!lesson || lesson === 'null' || (typeof lesson === 'object' && Object.keys(lesson).length === 0)) {
+    return { noLesson: {} };
+  }
   
+  // Если урок уже нормализован, возвращаем его как есть
+  if (lesson.commonLesson || lesson.subgroupedLesson || lesson.noLesson) return lesson;
+
   const findGroup = (obj: any): string | undefined => {
     if (typeof obj === 'string') return obj;
     if (!obj || typeof obj !== 'object') return undefined;
@@ -47,7 +44,16 @@ function normalizeLessonForApi(lesson: any): any {
   const sub = lesson.subgroupedLesson || lesson.SubgroupedLesson;
   if (sub) return { subgroupedLesson: { ...sub, subgroups: (sub.subgroups || []).map((s: any) => ({ ...s, group: findGroup(s) || findGroup(lesson) })) } };
 
-  if (lesson.name) return { commonLesson: { ...lesson, group: findGroup(lesson) } };
+  if (lesson.name || lesson.teacher || lesson.room) {
+    return {
+      commonLesson: {
+        name: lesson.name || '',
+        teacher: lesson.teacher || '',
+        room: lesson.room || '',
+        group: lesson.group || findGroup(lesson) || ''
+      }
+    };
+  }
   return { noLesson: {} };
 }
 
@@ -64,6 +70,19 @@ async function fetchApi<T>(endpoint: string, useCache: boolean = true): Promise<
   if (!response.ok) throw new Error(`Status: ${response.status}`);
   
   const data = await response.json();
+  
+  // Нормализация расписания
+  if (data.weeks) {
+    data.weeks = data.weeks.map((week: any) => ({
+      ...week,
+      days: week.days.map((day: any) => ({
+        ...day,
+        lessons: (day.lessons || []).map(normalizeLessonForApi)
+      }))
+    }));
+  }
+
+  // Нормализация замен
   if (data.overrides) {
     data.overrides = data.overrides.map((o: any) => ({
       ...o,
@@ -87,25 +106,15 @@ export const scheduleApi = {
   refreshOverrides: (id: string, date?: string) => {
     const q = date ? `?date=${date}` : '';
     return fetchApi<any>(`/schedule/${encodeURIComponent(id)}/overrides${q}`, false);
+  },
+  // 🔥 Новый метод для Schedule.tsx
+  getInfo: async (id: string, date: string, scheduleUpdate?: number, eventsHash?: string) => {
+    // Получаем всё параллельно для скорости
+    const [schedule, overrides, events] = await Promise.all([
+      scheduleApi.getSchedule(id),
+      scheduleApi.refreshOverrides(id, date),
+      scheduleApi.getEvents(id)
+    ]);
+    return { schedule, overrides, events, schedule_update: Date.now() };
   }
 };
-
-export async function fetchData(endpoint: string): Promise<any> {
-  const [path, query] = endpoint.split('?');
-  const clean = path.startsWith('/') ? path.substring(1) : path;
-  const parts = clean.split('/');
-
-  if (clean === 'items') return scheduleApi.getItems();
-  if (parts.length === 2) {
-    const name = decodeURIComponent(parts[0]);
-    if (parts[1] === 'schedule') return scheduleApi.getSchedule(name);
-    if (parts[1] === 'events') return scheduleApi.getEvents(name);
-    if (parts[1] === 'overrides') {
-      const d = new URLSearchParams(query || "").get('date');
-      return scheduleApi.getOverrides(name, d || undefined);
-    }
-  }
-  return scheduleApi.getSchedule(decodeURIComponent(clean));
-}
-
-export default scheduleApi;

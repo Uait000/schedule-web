@@ -364,7 +364,7 @@ function DropdownMenu({
   if (!isOpen) return null; 
   
   const handleMenuClick = (action: string) => { 
-    if (action !== 'help') onClose();
+    if (action !== 'help' && action !== 'install') onClose();
     
     if (action === 'overrides') { onCheckOverrides(); } 
     else if (action === 'history') { onOpenHistory(); } 
@@ -386,7 +386,7 @@ function DropdownMenu({
         <button id="menu-item-history" className="dropdown-item" onClick={() => handleMenuClick('history')}><Icon name="history" /><span>История замен</span></button> 
         <button id="menu-item-notes" className="dropdown-item" onClick={() => handleMenuClick('notes')}><Icon name="description" /><span>Мои заметки</span></button> 
         <button id="menu-item-add-course" className="dropdown-item" onClick={() => handleMenuClick('addCourse')}><Icon name="add_circle" /><span>Добавить курс</span></button> 
-        <button id="menu-item-install" className="dropdown-item" onClick={() => handleMenuClick('install')}><Icon name="download" /><span>Установить приложение</span></button> 
+        <button id="menu-item-install" className="dropdown-item" onClick={() => handleMenuClick('install')} style={{ color: 'var(--color-primary)', fontWeight: '600' }}><Icon name="download" /><span>Установить приложение</span></button> 
         <button id="menu-item-change-group" className="dropdown-item" onClick={() => handleMenuClick('changeGroup')}><Icon name="group" /><span>Поменять группу</span></button> 
         <button id="menu-item-help" className="dropdown-item" onClick={() => handleMenuClick('help')}><Icon name="help_outline" /><span>Как пользоваться?</span></button>
         <button id="menu-item-feedback" className="dropdown-item" onClick={() => handleMenuClick('feedback')}><Icon name="feedback" /><span>Обратная связь</span></button> 
@@ -444,7 +444,7 @@ function processSubgroupedOverride(originalLesson: Lesson, overrideWillBe: Lesso
 function Snackbar({ message, isVisible, onClose, link, linkText }: { message: string; isVisible: boolean; onClose: () => void; link?: string | null; linkText?: string; }) { 
   useEffect(() => { 
     if (isVisible) { 
-      const timer = setTimeout(() => { onClose(); }, 5000);
+      const timer = setTimeout(() => { onClose(); }, 7000);
       return () => clearTimeout(timer); 
     } 
   }, [isVisible, onClose]); 
@@ -479,6 +479,36 @@ export function ScheduleScreen() {
   const { activeDayIndex, setActiveDayIndex, activeWeekIndex, setActiveWeekIndex, applyOverrides, setApplyOverrides, selectedDate, setSelectedDate, resetToToday } = useScheduleState();
   
   const [appState, setAppState] = useState(() => dataStore.getState());
+
+  // 🔥 ЛОГИКА УСТАНОВКИ (PWA)
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (!deferredPrompt) {
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+      if (isIOS) {
+        showMessage("Нажмите кнопку 'Поделиться' в Safari и выберите 'На экран «Домой»'");
+      } else {
+        showMessage("Используйте меню браузера (три точки) -> 'Установить приложение'");
+      }
+      return;
+    }
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = dataStore.subscribe((newState) => {
       setAppState(prev => {
@@ -565,25 +595,19 @@ export function ScheduleScreen() {
     const formattedDate = format(date, 'yyyy-MM-dd');
     
     try {
-        const state = dataStore.getState();
-        const cachedProfile = state.profiles[profileType];
         const metadata = dataStore.getProfileMetadata(profileId);
 
-        if (cachedProfile?.schedule) setFullSchedule(cachedProfile.schedule);
-        if (cachedProfile?.overrides) setOverrides(cachedProfile.overrides);
-        if (metadata.events) setCalendarEvents(metadata.events);
+        // Используем отдельные запросы для стабильности
+        const [schedRes, ovrRes, evsRes] = await Promise.all([
+          scheduleApi.getSchedule(profileId).catch(() => null),
+          scheduleApi.refreshOverrides(profileId, formattedDate).catch(() => null),
+          scheduleApi.getEvents(profileId).catch(() => null)
+        ]);
 
-        const response = await scheduleApi.getInfo(
-            profileId, 
-            formattedDate, 
-            metadata.scheduleUpdate, 
-            metadata.eventsHash || "" 
-        );
-
-        if (response.schedule) {
-            let normalizedSchedule = response.schedule;
-             if (response.schedule.weeks) {
-                 normalizedSchedule = { ...response.schedule, weeks: response.schedule.weeks.map((week: any) => ({
+        if (schedRes) {
+            let normalizedSchedule = schedRes;
+             if (schedRes.weeks) {
+                 normalizedSchedule = { ...schedRes, weeks: schedRes.weeks.map((week: any) => ({
                     ...week,
                     days: week.days.map((day: any) => ({
                         ...day,
@@ -594,23 +618,21 @@ export function ScheduleScreen() {
                  }))};
              }
             setFullSchedule(normalizedSchedule);
-            if (response.schedule_update) {
-                dataStore.updateProfileMetadata(profileId, { scheduleUpdate: response.schedule_update });
-            }
         }
 
-        if (response.events) {
-            setCalendarEvents(response.events.events);
+        if (evsRes) {
+            const evs = evsRes.events || evsRes;
+            setCalendarEvents(evs);
             dataStore.updateProfileMetadata(profileId, { 
-                events: response.events.events,
-                eventsHash: response.events.sha256 
+                events: evs,
+                eventsHash: evsRes.sha256 
             });
         }
 
-        if (response.overrides) {
+        if (ovrRes) {
             const normalizedOverrides = {
-                ...response.overrides,
-                overrides: response.overrides.overrides.map((override: any) => ({
+                ...ovrRes,
+                overrides: (ovrRes.overrides || []).map((override: any) => ({
                     ...override,
                     shouldBe: normalizeLesson(override.shouldBe),
                     willBe: normalizeLesson(override.willBe)
@@ -626,15 +648,15 @@ export function ScheduleScreen() {
                 [profileType]: {
                     ...s.profiles[profileType],
                     id: profileId,
-                    schedule: response.schedule || fullSchedule || cachedProfile?.schedule,
-                    overrides: response.overrides || overrides || cachedProfile?.overrides
+                    schedule: schedRes || fullSchedule,
+                    overrides: ovrRes || overrides
                 }
             }
         }));
 
     } catch (err) { 
-        console.error(err); 
-        if (!fullSchedule) setError('Не удалось загрузить данные.'); 
+        console.error("Load Error:", err); 
+        if (!fullSchedule) setError('Ошибка сервера. Попробуйте позже.'); 
     } finally { setIsLoading(false); }
   };
 
@@ -685,14 +707,17 @@ export function ScheduleScreen() {
   };
   
   const handleDateSelect = (date: Date) => { 
-     setSelectedDate(date);
-     setActiveWeekIndex(getWeekNumber(date));
-     setActiveDayIndex(getDay(date) === 0 || getDay(date) === 6 ? 0 : getDayIndex(date));
+      setSelectedDate(date);
+      setActiveWeekIndex(getWeekNumber(date));
+      setActiveDayIndex(getDay(date) === 0 || getDay(date) === 6 ? 0 : getDayIndex(date));
   };
 
-  const checkOverrides = async () => {
-    await loadProfileData(currentProfileId, isTeacherView ? ProfileType.TEACHER : ProfileType.STUDENT, selectedDate);
-    showMessage("Данные обновлены");
+  // 🔥 ОБНОВЛЕННАЯ ФУНКЦИЯ: ТОЛЬКО ОКНО С ПЕРЕХОДОМ
+  const checkOverrides = () => {
+    setSnackbarMessage("Проверьте актуальное расписание замен на официальном сайте ТТЖТ.");
+    setSnackbarLink("https://ttgt.org/images/pdf/zamena.pdf");
+    setSnackbarLinkText("Перейти на сайт");
+    setShowSnackbar(true);
   };
 
   const toggleApplyOverrides = () => {
@@ -742,28 +767,24 @@ export function ScheduleScreen() {
 
   useEffect(() => {
       if(!currentProfileId || !hasInitialized.current) return;
-      const metadata = dataStore.getProfileMetadata(currentProfileId);
-      scheduleApi.getInfo(
-          currentProfileId, 
-          dateKey, 
-          metadata.scheduleUpdate, 
-          metadata.eventsHash || ""
-      ).then(res => {
-          if (res && res.overrides) {
+      Promise.all([
+        scheduleApi.refreshOverrides(currentProfileId, dateKey).catch(() => null),
+        scheduleApi.getSchedule(currentProfileId).catch(() => null)
+      ]).then(([ovr, sched]) => {
+          if (ovr) {
               const normalized = {
-                ...res.overrides,
-                overrides: res.overrides.overrides.map((o: any) => ({
+                ...ovr,
+                overrides: (ovr.overrides || []).map((o: any) => ({
                     ...o,
                     shouldBe: normalizeLesson(o.shouldBe),
                     willBe: normalizeLesson(o.willBe)
                 }))
               };
               setOverrides(normalized);
-          } else { setOverrides(null); }
-          if (res && res.schedule) { setFullSchedule(res.schedule); }
-      }).catch(err => {
-          console.error('Info fetch error:', err);
-          setOverrides(null);
+          } 
+          if (sched) { setFullSchedule(sched); }
+      }).catch(() => {
+          console.warn('Background update skipped');
       });
   }, [dateKey, currentProfileId]);
 
@@ -771,38 +792,44 @@ export function ScheduleScreen() {
     if (!fullSchedule) { setDisplaySchedule(null); return; }
     const newSchedule = JSON.parse(JSON.stringify(fullSchedule)) as Schedule;
     const currentWeekData = newSchedule.weeks?.[activeWeekIndex % 2];
+    
+    if (!currentWeekData) { setDisplaySchedule(newSchedule); return; }
+
     const blockingEvent = calendarEvents.find(event => {
         if (event.type === 'attestation' || event.type === 'holiday') return false; 
         const start = startOfDay(parseISO(event.dateStart));
         const end = endOfDay(parseISO(event.dateEnd));
         return isWithinInterval(selectedDate, { start, end });
     });
+
     if (blockingEvent) {
-         if (currentWeekData) {
-             const day = currentWeekData.days[activeDayIndex];
-             if (day) day.lessons = day.lessons.map(() => ({ 
-                commonLesson: { name: blockingEvent.title, teacher: '—', room: '—', group: '' } 
+         const day = currentWeekData.days[activeDayIndex];
+         if (day && day.lessons) {
+             day.lessons = day.lessons.map(() => ({ 
+                commonLesson: { name: blockingEvent.title || "Событие", teacher: '—', room: '—', group: '' } 
              }));
          }
          setDisplaySchedule(newSchedule);
          return; 
     }
+
     if (!applyOverrides || !overrides) { setDisplaySchedule(newSchedule); return; }
+    
     const isAttestation = overrides.practiceCode === '::' || overrides.practiceCode === ':';
     const isHoliday = overrides.practiceCode === '=' || overrides.practiceCode === '*';
+    
     if (overrides.isPractice && overrides.isBlocking && !isAttestation && !isHoliday) {
-        if (currentWeekData) {
-            const day = currentWeekData.days[activeDayIndex];
-            if (day) {
-                const practicePlaceholder = { 
-                    commonLesson: { name: overrides.practiceTitle || "Практика", teacher: "", room: overrides.practiceCode || "—", group: "" } 
-                };
-                day.lessons = day.lessons.map(() => practicePlaceholder);
-            }
+        const day = currentWeekData.days[activeDayIndex];
+        if (day && day.lessons) {
+            const practicePlaceholder = { 
+                commonLesson: { name: overrides.practiceTitle || "Практика", teacher: "", room: overrides.practiceCode || "—", group: "" } 
+            };
+            day.lessons = day.lessons.map(() => practicePlaceholder);
         }
     }
+
     const { overrides: overrideList } = overrides;
-    if (overrideList && overrideList.length > 0 && currentWeekData) {
+    if (overrideList && overrideList.length > 0) {
       const day = currentWeekData.days[activeDayIndex];
       if (day && day.lessons) {
         overrideList.forEach(override => {
@@ -835,7 +862,9 @@ export function ScheduleScreen() {
   }, [fullSchedule, overrides, applyOverrides, calendarEvents, selectedDate.getTime(), activeWeekIndex, activeDayIndex, isTeacherView]);
 
   const lessonsToShow = useMemo(() => {
-     const baseLessons = displaySchedule?.weeks?.[activeWeekIndex % 2]?.days?.[activeDayIndex]?.lessons;
+     const weekData = displaySchedule?.weeks?.[activeWeekIndex % 2];
+     const baseLessons = weekData?.days?.[activeDayIndex]?.lessons;
+     
      const lessonCount = activeDayIndex === 1 ? 6 : 5;
      const lessonsArray = Array.from({ length: lessonCount }, (_, i) => {
          if (activeDayIndex === 1) {
@@ -844,6 +873,7 @@ export function ScheduleScreen() {
              else { const baseIndex = i - 1; return (baseLessons && baseLessons[baseIndex]) ? baseLessons[baseIndex] : { noLesson: {} }; }
          } else { return (baseLessons && baseLessons[i]) ? baseLessons[i] : { noLesson: {} }; }
      });
+     
      const myCourses = appState.customCourses.filter(c => c.weekIndex === activeWeekIndex && c.dayIndex === activeDayIndex && c.profileId === currentProfileId);
      myCourses.sort((a, b) => a.lessonIndex - b.lessonIndex);
      myCourses.forEach(course => {
@@ -901,8 +931,11 @@ export function ScheduleScreen() {
     } else {
        info = findNextPractice(displaySchedule, activeWeekIndex, selectedDate);
     }
-    if (isTeacherView && info) {
-        const nameLower = info.name.toLowerCase();
+
+    if (!info) return null;
+    const nameLower = info.name.toLowerCase();
+
+    if (isTeacherView) {
         const isAllowed = 
             nameLower.includes('промежуточная аттестация') || 
             nameLower.includes('каникулы') || 
@@ -910,8 +943,15 @@ export function ScheduleScreen() {
             nameLower.includes('подготовка к государственной итоговой аттестации');
         return isAllowed ? info : null;
     }
+
+    const isFirstYear = currentProfileId.includes("-1-");
+    if (isFirstYear) {
+        const isAllowed = nameLower.includes('промежуточная аттестация') || nameLower.includes('каникулы');
+        return isAllowed ? info : null;
+    }
+
     return info;
-  }, [calendarEvents, selectedDate.getTime(), overrides, displaySchedule, activeWeekIndex, isTeacherView]);
+  }, [calendarEvents, selectedDate.getTime(), overrides, displaySchedule, activeWeekIndex, isTeacherView, currentProfileId]);
 
   const handlePracticeClick = () => { if (practiceInfo) setIsPracticeModalOpen(true); };
 
@@ -989,7 +1029,7 @@ export function ScheduleScreen() {
           {!isLoading && !error && renderLessons()}
           {!error && (<div className="overrides-toggle-container" style={{ marginTop: '16px', marginBottom: '0' }}><button className={`overrides-toggle ${applyOverrides ? 'active' : ''}`} onClick={toggleApplyOverrides} disabled={isSwitchingProfile}><Icon name="swap_horiz" /><span>Учитывать замены</span>{applyOverrides && (overrides?.overrides?.length || 0) > 0 && (<span className="overrides-badge">{overrides!.overrides.length}</span>)}</button></div>)}
         </div>
-        <DropdownMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onCheckOverrides={checkOverrides} onOpenHistory={() => setIsHistoryOpen(true)} onOpenNotes={() => setIsNotesModalOpen(true)} onInstallApp={() => {}} onAddCourse={() => { setIsMenuOpen(false); setIsAddCourseOpen(true); }} onStartTour={startTour} />
+        <DropdownMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onCheckOverrides={checkOverrides} onOpenHistory={() => setIsHistoryOpen(true)} onOpenNotes={() => setIsNotesModalOpen(true)} onInstallApp={handleInstallApp} onAddCourse={() => { setIsMenuOpen(false); setIsAddCourseOpen(true); }} onStartTour={startTour} />
         <AddCourseModal isOpen={isAddCourseOpen} onClose={() => setIsAddCourseOpen(false)} activeWeek={activeWeekIndex} activeDay={activeDayIndex} schedule={fullSchedule} overrides={applyOverrides ? overrides : null} profileId={currentProfileId} />
         <CustomCalendar isOpen={isCalendarOpen} onClose={() => setIsCalendarOpen(false)} onSelectDate={handleDateSelect} currentDate={selectedDate} calendarEvents={calendarEvents} />
         <NoteModal lesson={lessonToEdit} onClose={() => setEditingLessonIndex(null)} onSave={handleSaveNote} savedNote={currentLessonData.notes} savedSubgroup={currentLessonData.subgroup} />

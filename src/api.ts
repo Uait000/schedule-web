@@ -2,7 +2,7 @@
 
 import { InfoResponse } from './types';
 
-const API_BASE_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = 'https://tih-ttgt.ru';
 
 const CACHE_KEYS = {
   SCHEDULE: 'api_cache_schedule',
