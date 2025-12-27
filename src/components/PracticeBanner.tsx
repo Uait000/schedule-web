@@ -58,64 +58,91 @@ export const PracticeBanner: React.FC<PracticeBannerProps> = ({ info, onClick })
         <div className="accent-bar" style={{ backgroundColor: style.accent }} />
         
         <div className="content-wrapper">
-          <div className="icon-box" style={{ backgroundColor: `${style.accent}33` }}>
-            <span className="material-icons" style={{ fontSize: '24px', color: style.accent }}>{style.icon}</span>
+          <div className="icon-box" style={{ backgroundColor: `${style.accent}22` }}>
+            <span className="material-icons banner-icon-span" style={{ color: style.accent }}>{style.icon}</span>
           </div>
           
           <div className="text-content">
-            <div className="banner-title" style={{ color: '#ffffff' }}>{displayTitle}</div>
-            <div className="banner-dates" style={{ color: 'rgba(255, 255, 255, 0.75)' }}>{dateString}</div>
+            <div className="banner-title">{displayTitle}</div>
+            <div className="banner-dates">{dateString}</div>
           </div>
         </div>
 
-        <span className="material-icons arrow-icon" style={{ color: '#ffffff' }}>chevron_right</span>
+        <span className="material-icons arrow-icon">chevron_right</span>
       </div>
 
       <style>{`
         .practice-banner-container {
             background-color: var(--color-surface-container);
             border-radius: 16px;
-            padding: 12px 16px;
-            /* Исправлено: убраны боковые отступы 16px, чтобы ширина совпадала с другими плашками */
+            padding: 12px 14px;
             margin: 0 0 16px 0; 
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
             border: 1px solid var(--color-border);
             position: relative;
             overflow: hidden;
-            transition: transform 0.1s ease;
+            transition: transform 0.1s ease, background-color 0.2s ease;
             width: 100%;
             box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
         }
 
-        .practice-banner-container:active { transform: scale(0.97); }
+        .practice-banner-container:active { transform: scale(0.98); background-color: var(--color-surface-variant); }
 
-        .accent-bar { position: absolute; left: 0; top: 0; bottom: 0; width: 6px; }
+        .accent-bar { position: absolute; left: 0; top: 0; bottom: 0; width: 5px; }
 
-        .content-wrapper { display: flex; align-items: center; gap: 14px; flex: 1; }
+        .content-wrapper { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
 
         .icon-box { 
-            min-width: 42px; height: 42px; border-radius: 12px; 
+            min-width: 40px; width: 40px; height: 40px; border-radius: 10px; 
             display: flex; align-items: center; justify-content: center; 
             flex-shrink: 0;
         }
+        
+        .banner-icon-span { font-size: 22px; }
 
         .text-content { 
             display: flex; flex-direction: column; 
-            justify-content: center; height: 42px; 
+            justify-content: center; 
+            min-width: 0; /* Важно для работы ellipsis */
+            flex: 1;
         }
 
         .banner-title { 
-            font-weight: 800; font-size: 15px; line-height: 1.2; 
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            color: #ffffff;
+            font-weight: 700; 
+            font-size: 15px; 
+            line-height: 1.2; 
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis;
+            margin-bottom: 2px;
         }
 
-        .banner-dates { font-size: 13px; font-weight: 600; margin-top: 1px; }
+        .banner-dates { 
+            color: rgba(255, 255, 255, 0.65);
+            font-size: 12px; 
+            font-weight: 500; 
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
 
-        .arrow-icon { opacity: 0.6; font-size: 20px; margin-left: 8px; }
+        .arrow-icon { color: rgba(255, 255, 255, 0.4); font-size: 20px; flex-shrink: 0; }
+
+        /* Адаптация для маленьких телефонов */
+        @media (max-width: 380px) {
+            .practice-banner-container { padding: 10px 12px; }
+            .icon-box { min-width: 36px; width: 36px; height: 36px; }
+            .banner-icon-span { font-size: 20px; }
+            .banner-title { font-size: 14px; }
+            .banner-dates { font-size: 11px; }
+            .content-wrapper { gap: 10px; }
+        }
       `}</style>
     </>
   );

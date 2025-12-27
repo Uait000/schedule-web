@@ -7,7 +7,7 @@ import { AllNotesModal } from '../components/AllNotesModal';
 import { Schedule, OverridesResponse, Lesson, CalendarEvent } from '../types';
 import { ProfileType } from '../types/profiles';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'; 
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, getDay, startOfWeek, addDays, parseISO, differenceInCalendarDays, isWithinInterval } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, getDay, startOfWeek, addDays, parseISO, differenceInCalendarDays, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { scheduleApi } from '../api'; 
 import { useScheduleState } from '../hooks/useScheduleState';
@@ -197,7 +197,7 @@ const Icon = ({ name, style = {} }: { name: string; style?: React.CSSProperties 
   <span className="material-icons" style={{ fontSize: 'inherit', verticalAlign: 'middle', ...style }}>{name}</span>
 );
 
-function CustomCalendar({ isOpen, onClose, onSelectDate, currentDate }: { isOpen: boolean; onClose: () => void; onSelectDate: (date: Date) => void; currentDate: Date; }) { 
+function CustomCalendar({ isOpen, onClose, onSelectDate, currentDate, calendarEvents }: { isOpen: boolean; onClose: () => void; onSelectDate: (date: Date) => void; currentDate: Date; calendarEvents: CalendarEvent[]; }) { 
   const [viewDate, setViewDate] = useState(currentDate); 
   const [dateInput, setDateInput] = useState(format(currentDate, 'dd.MM.yyyy')); 
   const [isValid, setIsValid] = useState(true); 
@@ -210,7 +210,19 @@ function CustomCalendar({ isOpen, onClose, onSelectDate, currentDate }: { isOpen
   const firstDayOfMonth = getDay(monthStart); 
   const startPadding = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1; 
   
+  const isDateHoliday = (date: Date) => {
+    return calendarEvents.some(event => {
+      if (event.type !== 'holiday') return false;
+      const start = startOfDay(parseISO(event.dateStart));
+      const end = endOfDay(parseISO(event.dateEnd));
+      return isWithinInterval(date, { start, end });
+    });
+  };
+
   const handleDayClick = (date: Date) => { 
+    const dayOfWeek = getDay(date);
+    if (dayOfWeek === 0 || dayOfWeek === 6 || isDateHoliday(date)) return; 
+
     onSelectDate(date); 
     setDateInput(format(date, 'dd.MM.yyyy')); 
     onClose(); 
@@ -301,9 +313,23 @@ function CustomCalendar({ isOpen, onClose, onSelectDate, currentDate }: { isOpen
         <div className="calendar-weekdays">{['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((day) => (<div key={day} className="calendar-weekday">{day}</div>))}</div> 
         <div className="calendar-days"> 
           {Array.from({ length: startPadding }).map((_, i) => (<div key={`empty-${i}`} className="calendar-day empty"></div>))} 
-          {days.map((day) => ( 
-            <button key={day.toString()} className={`calendar-day ${isSameDay(day, currentDate) ? 'selected' : ''} ${isSameDay(day, new Date()) ? 'today' : ''}`} onClick={() => handleDayClick(day)} title={format(day, 'd MMMM yyyy', { locale: ru })}>{format(day, 'd')}</button> 
-          ))} 
+          {days.map((day) => {
+            const dayOfWeek = getDay(day);
+            const isHoliday = isDateHoliday(day);
+            const isDisabled = dayOfWeek === 0 || dayOfWeek === 6 || isHoliday;
+            
+            return ( 
+              <button 
+                key={day.toString()} 
+                className={`calendar-day ${isSameDay(day, currentDate) ? 'selected' : ''} ${isSameDay(day, new Date()) ? 'today' : ''} ${isDisabled ? 'disabled' : ''}`} 
+                onClick={() => handleDayClick(day)} 
+                disabled={isDisabled}
+                title={isHoliday ? 'Каникулы' : format(day, 'd MMMM yyyy', { locale: ru })}
+              >
+                {format(day, 'd')}
+              </button> 
+            );
+          })} 
         </div> 
         <div className="calendar-footer"> 
           <button onClick={onClose} className="calendar-cancel-btn"><Icon name="close" />Закрыть</button> 
@@ -408,7 +434,7 @@ function processSubgroupedOverride(originalLesson: Lesson, overrideWillBe: Lesso
     .sort((a, b) => (a.subgroup_index || 0) - (b.subgroup_index || 0));
   
   return {
-     subgroupedLesson: {
+    subgroupedLesson: {
       name: originalName,
       subgroups: sortedSubgroups
     }
@@ -747,8 +773,8 @@ export function ScheduleScreen() {
     const currentWeekData = newSchedule.weeks?.[activeWeekIndex % 2];
     const blockingEvent = calendarEvents.find(event => {
         if (event.type === 'attestation' || event.type === 'holiday') return false; 
-        const start = parseISO(event.dateStart);
-        const end = parseISO(event.dateEnd);
+        const start = startOfDay(parseISO(event.dateStart));
+        const end = endOfDay(parseISO(event.dateEnd));
         return isWithinInterval(selectedDate, { start, end });
     });
     if (blockingEvent) {
@@ -853,11 +879,8 @@ export function ScheduleScreen() {
   const currentLessonData = editingLessonIndex !== null ? getSavedLessonData(currentProfileId, activeWeekIndex, activeDayIndex, editingLessonIndex) : { notes: '', subgroup: 0 };
   const isWeekCurrent = activeWeekIndex === getWeekNumber(new Date());
 
-  // 🔥 ОБНОВЛЕННАЯ ЛОГИКА БАННЕРА ДЛЯ ПРЕПОДАВАТЕЛЕЙ
   const practiceInfo = useMemo<PracticeInfo | null>(() => {
-    // 1. Получаем базовое событие (из календаря или уроков)
     let info: PracticeInfo | null = null;
-    
     const upcomingHoliday = findUpcomingEvent(calendarEvents, selectedDate, 4);
     if (upcomingHoliday) {
         info = upcomingHoliday;
@@ -865,24 +888,19 @@ export function ScheduleScreen() {
        const title = overrides.practiceTitle || "Событие";
        const code = overrides.practiceCode || "";
        let type: 'practice' | 'attestation' | 'holiday' | 'gia' | 'session' = 'practice';
-       
        if (code === '::' || title.toLowerCase().includes('аттестация')) type = 'attestation';
        else if (['III', 'D'].includes(code)) type = 'gia';
        else if (code === '=') type = 'holiday';
-
        const dateStart = overrides.dateStart ? parseISO(overrides.dateStart) : selectedDate;
        const dateEnd = overrides.dateEnd ? parseISO(overrides.dateEnd) : null;
        const returnDate = overrides.returnDate ? parseISO(overrides.returnDate) : null;
        const today = new Date();
        today.setHours(0, 0, 0, 0);
        const daysUntil = differenceInCalendarDays(dateStart, today);
-
        info = { name: title, type: type, dateStart: dateStart, dateEnd: dateEnd, returnDate: returnDate, daysUntil: daysUntil, isActive: daysUntil <= 0 };
     } else {
        info = findNextPractice(displaySchedule, activeWeekIndex, selectedDate);
     }
-
-    // 🔥 ФИЛЬТРАЦИЯ: Если это преподаватель, показываем только разрешенные типы событий
     if (isTeacherView && info) {
         const nameLower = info.name.toLowerCase();
         const isAllowed = 
@@ -890,21 +908,61 @@ export function ScheduleScreen() {
             nameLower.includes('каникулы') || 
             nameLower.includes('государственная итоговая аттестация') || 
             nameLower.includes('подготовка к государственной итоговой аттестации');
-        
         return isAllowed ? info : null;
     }
-
     return info;
   }, [calendarEvents, selectedDate.getTime(), overrides, displaySchedule, activeWeekIndex, isTeacherView]);
 
   const handlePracticeClick = () => { if (practiceInfo) setIsPracticeModalOpen(true); };
 
+  const currentWeekDates = useMemo(() => {
+    const monday = startOfWeek(selectedDate, { weekStartsOn: 1 });
+    return [0, 1, 2, 3, 4].map((i) => addDays(monday, i));
+  }, [selectedDate]);
+
   return (
     <>
-      <style>{` @import url('https://fonts.googleapis.com/css2?family=Material+Icons&display=block'); `}</style>
-      <div className="container">
+      <style>{` 
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Material+Icons&display=block'); 
+
+        :root {
+          font-family: 'Inter', sans-serif !important;
+        }
+
+        .calendar-day.disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; background: rgba(255,255,255,0.05); }
+        
+        .tab-button-content { 
+          display: flex; 
+          flex-direction: column; 
+          align-items: center; 
+          gap: 1px; 
+          padding: 4px 0;
+          font-family: 'Inter', sans-serif;
+        }
+
+        .tab-day-name { 
+          font-size: 14px; 
+          font-weight: 700; 
+          color: var(--color-text);
+          opacity: 0.6;
+        }
+
+        .tab-day-date { 
+          font-size: 14px; 
+          font-weight: 700; 
+          color: var(--color-text); 
+          white-space: nowrap; 
+          opacity: 0.6;
+        }
+
+        .tab-button.active .tab-day-name,
+        .tab-button.active .tab-day-date { color: #8c67f6; opacity: 1; }
+        .tab-indicator { margin-top: 4px !important; height: 3px !important; border-radius: 4px !important; }
+      `}</style>
+      <div className="container" style={{ fontFamily: 'Inter, sans-serif' }}>
         <div className="schedule-header">
-          <h2 className="schedule-title">Расписание</h2>
+          <h2 className="schedule-title" style={{ fontWeight: 800 }}>Расписание</h2>
           <button id="tour-menu" className="menu-button" onClick={() => setIsMenuOpen(true)}><Icon name="more_vert" /></button>
         </div>
         <div id="tour-profile">
@@ -916,7 +974,11 @@ export function ScheduleScreen() {
           <div className="schedule-tabs" ref={tabsRef}>
             {DAYS_OF_WEEK.map((day, index) => (
               <button key={day} className={`tab-button ${activeDayIndex === index ? 'active' : ''} ${isAnimating ? 'no-transition' : ''}`} onClick={() => handleDayChange(index)} disabled={isAnimating || isSwitchingProfile}>
-                <span className="tab-button-content">{day}{activeDayIndex === index && <div className="tab-indicator" />}</span>
+                <span className="tab-button-content">
+                  <span className="tab-day-name">{day}</span>
+                  <span className="tab-day-date">{format(currentWeekDates[index], 'd MMMM', { locale: ru })}</span>
+                  {activeDayIndex === index && <div className="tab-indicator" />}
+                </span>
               </button>
             ))}
           </div>
@@ -929,7 +991,7 @@ export function ScheduleScreen() {
         </div>
         <DropdownMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onCheckOverrides={checkOverrides} onOpenHistory={() => setIsHistoryOpen(true)} onOpenNotes={() => setIsNotesModalOpen(true)} onInstallApp={() => {}} onAddCourse={() => { setIsMenuOpen(false); setIsAddCourseOpen(true); }} onStartTour={startTour} />
         <AddCourseModal isOpen={isAddCourseOpen} onClose={() => setIsAddCourseOpen(false)} activeWeek={activeWeekIndex} activeDay={activeDayIndex} schedule={fullSchedule} overrides={applyOverrides ? overrides : null} profileId={currentProfileId} />
-        <CustomCalendar isOpen={isCalendarOpen} onClose={() => setIsCalendarOpen(false)} onSelectDate={handleDateSelect} currentDate={selectedDate} />
+        <CustomCalendar isOpen={isCalendarOpen} onClose={() => setIsCalendarOpen(false)} onSelectDate={handleDateSelect} currentDate={selectedDate} calendarEvents={calendarEvents} />
         <NoteModal lesson={lessonToEdit} onClose={() => setEditingLessonIndex(null)} onSave={handleSaveNote} savedNote={currentLessonData.notes} savedSubgroup={currentLessonData.subgroup} />
         <Snackbar message={snackbarMessage || ''} isVisible={showSnackbar} onClose={() => { setShowSnackbar(false); setSnackbarLink(null); }} link={snackbarLink} linkText={snackbarLinkText} />
         <HistoryModal isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} history={history} isTeacherView={isTeacherView} />
