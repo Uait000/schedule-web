@@ -49,7 +49,36 @@ export interface OverridesResponse {
   day?: number;
   month?: number;
   year?: number;
-  isPractice?: boolean; // 🔥 ДОБАВЛЕНО
+  isPractice?: boolean;
+  practiceTitle?: string;
+  practiceCode?: string;
+  isBlocking?: boolean;
+  dateStart?: string;
+  dateEnd?: string;
+  returnDate?: string;
+}
+
+export interface CalendarEvent {
+  title: string;
+  code: string;
+  type: 'holiday' | 'attestation' | 'gia' | 'practice';
+  dateStart: string;
+  dateEnd: string;
+  weeks_count: number;
+}
+
+export interface EventsResponse {
+  events: CalendarEvent[];
+  sha256: string;
+}
+
+// 🔥 Новый тип для комбинированного ответа /info
+export interface InfoResponse {
+  overrides?: OverridesResponse; // Придет, если дата изменилась
+  schedule?: Schedule;           // Придет, если файл обновился
+  events?: EventsResponse;       // Придет, если хеш не совпал
+  update?: any;
+  schedule_update?: number;      // Timestamp обновления расписания на сервере
 }
 
 export interface HistoryEntry extends OverridesResponse {

@@ -86,13 +86,11 @@ const getDisplayIndex = (index: number, isTuesday: boolean, isClassHour: boolean
   return `${index + 1}.`;
 };
 
-// 🔥 ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ ОТОБРАЖЕНИЯ КАБИНЕТА
 const RoomDisplay = ({ room }: { room: string }) => {
   if (!room || room.trim() === '' || room.trim() === '-' || room.trim() === '–') {
     return null;
   }
   
-  // Если в поле room написано "ПРАКТИКА" или что-то длинное, не пишем слово "Кабинет"
   if (room.length > 5 || room.toLowerCase().includes('практика')) {
      return <span>{room}</span>;
   }
@@ -131,7 +129,6 @@ const LessonContent = ({
   if (lesson.commonLesson) {
     const { name, teacher, room, group } = lesson.commonLesson;
     
-    // 🔥 ПРОВЕРКА НА ПРАКТИКУ ДЛЯ СТИЛИЗАЦИИ
     const isPractice = name.toLowerCase().includes('практика') || name.toLowerCase().includes('аттестация') || name.toLowerCase().includes('гиа');
 
     return (
@@ -140,7 +137,12 @@ const LessonContent = ({
         <span className="lesson-details">
           {isTeacherView ? (
             <>
-              {group && <span>Группа: {group}<br /></span>}
+              {/* 🔥 Отображаем группу для преподавателя */}
+              {(group || (lesson as any).group) ? (
+                <span>Группа: {group || (lesson as any).group}<br /></span>
+              ) : (
+                <span>Группа не указана<br /></span>
+              )}
               <RoomDisplay room={room} />
             </>
           ) : (
@@ -167,7 +169,8 @@ const LessonContent = ({
                     <span style={{ fontWeight: 'bold', opacity: 0.8 }}>{idx + 1} п/г </span>
                     {isTeacherView ? (
                       <>
-                        {subgroup.group && <span>Гр. {subgroup.group} </span>}
+                        {/* 🔥 Отображаем группу для преподавателя в подгруппах */}
+                        {(subgroup.group || (lesson as any).group) && <span>Гр. {subgroup.group || (lesson as any).group} </span>}
                         {subgroup.room && <span style={{ whiteSpace: 'nowrap' }}> | <RoomDisplay room={subgroup.room} /></span>}
                       </>
                     ) : (
@@ -231,8 +234,6 @@ export default function ScheduleItem({
   
   const displayIndex = getDisplayIndex(index, isTuesday, isClassHour);
   
-  // 🔥 ОПРЕДЕЛЯЕМ, ПРАКТИКА ЛИ ЭТО, ЧТОБЫ ДОБАВИТЬ СПЕЦИАЛЬНЫЙ КЛАСС
-  // Теперь проверяем и commonLesson, и subgroupedLesson (на всякий случай)
   let isPractice = false;
   if (lesson) {
       const name = lesson.commonLesson?.name || lesson.subgroupedLesson?.name || '';

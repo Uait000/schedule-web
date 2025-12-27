@@ -1,10 +1,16 @@
 // src/utils/DataStore.ts
-
 import { ProfileType, ProfilesState, Profile } from '../types/profiles';
 import { HistoryEntry, CustomCourse } from '../types';
 
+export interface ProfileMetadata {
+  scheduleUpdate: number;
+  eventsHash: string;
+  events?: any[];
+}
+
 export interface AppState {
   profiles: ProfilesState;
+  profileMetadata: Record<string, ProfileMetadata>;
   overrideHistory: HistoryEntry[];
   customCourses: CustomCourse[]; 
   feedbackSent: boolean;
@@ -18,6 +24,7 @@ const DEFAULT_STATE: AppState = {
     student: undefined,
     teacher: undefined
   },
+  profileMetadata: {},
   overrideHistory: [],
   customCourses: [], 
   feedbackSent: false,
@@ -55,6 +62,7 @@ export class DataStore {
             ...DEFAULT_STATE.profiles,
             ...(parsed.profiles || {})
           },
+          profileMetadata: parsed.profileMetadata || {},
           overrideHistory: Array.isArray(parsed.overrideHistory) ? parsed.overrideHistory : [],
           customCourses: Array.isArray(parsed.customCourses) ? parsed.customCourses : [] 
         };
@@ -76,14 +84,17 @@ export class DataStore {
 
   subscribe(listener: (state: AppState) => void): () => void {
     this.listeners.push(listener);
-    listener(this.state);
+    // 🔥 ИСПРАВЛЕНО: Убрали немедленный вызов listener(this.state), 
+    // чтобы не провоцировать лишний цикл обновлений при подписке
     return () => {
       this.listeners = this.listeners.filter(l => l !== listener);
     };
   }
 
   private notifyListeners(): void {
-    this.listeners.forEach(listener => listener(this.state));
+    // Делаем копию состояния, чтобы React понимал, что объект изменился
+    const currentState = { ...this.state };
+    this.listeners.forEach(listener => listener(currentState));
   }
 
   async updateData(updater: (state: AppState) => AppState): Promise<void> {
@@ -92,21 +103,39 @@ export class DataStore {
   }
 
   getState(): AppState {
-    return this.state;
+    return { ...this.state };
   }
 
-  setProfile(type: ProfileType, profileData: Profile): void {
-    this.updateData(state => ({
+  getProfileMetadata(profileId: string): ProfileMetadata {
+    return this.state.profileMetadata[profileId] || { scheduleUpdate: 0, eventsHash: "" };
+  }
+
+  async updateProfileMetadata(profileId: string, metadata: Partial<ProfileMetadata>): Promise<void> {
+    await this.updateData(state => ({
       ...state,
-      profiles: {
-        ...state.profiles,
-        [type]: profileData
+      profileMetadata: {
+        ...state.profileMetadata,
+        [profileId]: {
+          ...(state.profileMetadata[profileId] || { scheduleUpdate: 0, eventsHash: "" }),
+          ...metadata
+        }
       }
     }));
   }
 
-  setLastUsed(type: ProfileType): void {
-    this.updateData(state => ({
+  async setProfile(type: ProfileType, profileData: Profile): Promise<void> {
+    const key = type.toLowerCase() as 'student' | 'teacher';
+    await this.updateData(state => ({
+      ...state,
+      profiles: {
+        ...state.profiles,
+        [key]: profileData
+      }
+    }));
+  }
+
+  async setLastUsed(type: ProfileType): Promise<void> {
+    await this.updateData(state => ({
       ...state,
       lastUsed: type,
       profiles: {
@@ -117,51 +146,26 @@ export class DataStore {
   }
 
   getCurrentProfile(): Profile | undefined {
-    return this.state.profiles[this.state.lastUsed];
+    const key = this.state.lastUsed.toLowerCase() as 'student' | 'teacher';
+    return this.state.profiles[key];
   }
 
-  addOverrideHistory(entry: HistoryEntry): void {
-    const currentProfileId = this.state.profiles[this.state.lastUsed]?.id;
-    
-    // 🔥 FIX: Приводим к типу string явно, так как мы знаем, что ID должен быть
-    const entryWithId: HistoryEntry = { 
-        ...entry, 
-        profileId: (entry.profileId || currentProfileId) as string 
-    };
-
-    if (!entryWithId.profileId) return;
-
-    this.updateData(state => {
-        const cleanHistory = state.overrideHistory.filter(item => 
-            !(item.profileId === entryWithId.profileId && 
-              item.day === entryWithId.day && 
-              item.month === entryWithId.month && 
-              item.year === entryWithId.year)
-        );
-        
-        return {
-            ...state,
-            overrideHistory: [entryWithId, ...cleanHistory].slice(0, 50)
-        };
-    });
-  }
-
-  addCustomCourse(course: CustomCourse): void {
-    this.updateData(state => ({
+  async addCustomCourse(course: CustomCourse): Promise<void> {
+    await this.updateData(state => ({
       ...state,
       customCourses: [...state.customCourses, course]
     }));
   }
 
-  removeCustomCourse(courseId: string): void {
-    this.updateData(state => ({
+  async removeCustomCourse(courseId: string): Promise<void> {
+    await this.updateData(state => ({
       ...state,
       customCourses: state.customCourses.filter(c => c.id !== courseId)
     }));
   }
 
   clear(): void {
-    this.state = DEFAULT_STATE;
+    this.state = { ...DEFAULT_STATE };
     this.saveState();
   }
 }
