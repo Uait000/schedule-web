@@ -197,6 +197,7 @@ const Icon = ({ name, style = {} }: { name: string; style?: React.CSSProperties 
   <span className="material-icons" style={{ fontSize: 'inherit', verticalAlign: 'middle', ...style }}>{name}</span>
 );
 
+// 🔥 ОБНОВЛЕННЫЙ КОМПОНЕНТ КАЛЕНДАРЯ
 function CustomCalendar({ isOpen, onClose, onSelectDate, currentDate, calendarEvents }: { isOpen: boolean; onClose: () => void; onSelectDate: (date: Date) => void; currentDate: Date; calendarEvents: CalendarEvent[]; }) { 
   const [viewDate, setViewDate] = useState(currentDate); 
   const [dateInput, setDateInput] = useState(format(currentDate, 'dd.MM.yyyy')); 
@@ -280,60 +281,57 @@ function CustomCalendar({ isOpen, onClose, onSelectDate, currentDate, calendarEv
   
   return ( 
     <div className="calendar-backdrop" onClick={onClose}> 
-      <div className="calendar-modal" onClick={(e) => e.stopPropagation()}> 
-        <div className="calendar-header"> 
+      <div className="calendar-modal-modern" onClick={(e) => e.stopPropagation()}> 
+        <div className="calendar-header-modern"> 
           <button onClick={() => setViewDate(subMonths(viewDate, 1))} className="calendar-nav-btn"><Icon name="chevron_left" /></button> 
           <span className="calendar-month-year">{format(viewDate, 'LLLL yyyy', { locale: ru })}</span> 
           <button onClick={() => setViewDate(addMonths(viewDate, 1))} className="calendar-nav-btn"><Icon name="chevron_right" /></button> 
         </div> 
-        <div style={{ marginBottom: '16px', padding: '0 8px' }}> 
-          <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: 'var(--color-text)', marginBottom: '8px' }}>Введите дату:</label> 
-          <input 
-            type="text" 
-            value={dateInput} 
-            onChange={handleDateInputChange} 
-            onKeyDown={handleKeyDown} 
-            placeholder="дд.мм.гггг" 
-            style={{ 
-              width: '100%', 
-              padding: '12px 16px', 
-              fontSize: '16px', 
-              border: `2px solid ${isValid ? 'var(--color-border)' : '#ff4444'}`, 
-              borderRadius: '12px', 
-              backgroundColor: 'var(--color-surface-container)', 
-              color: 'var(--color-text)', 
-              boxSizing: 'border-box', 
-              textAlign: 'center', 
-              fontFamily: 'monospace', 
-              fontWeight: '500' 
-            }} 
-          /> 
-          {!isValid && <div style={{ color: '#ff4444', fontSize: '12px', marginTop: '4px', textAlign: 'center' }}>Неверная дата</div>} 
+        
+        <div className="calendar-input-section"> 
+          <div className="input-modern-wrapper">
+             <Icon name="edit_calendar" style={{ opacity: 0.5, marginRight: '8px' }} />
+             <input 
+              type="text" 
+              value={dateInput} 
+              onChange={handleDateInputChange} 
+              onKeyDown={handleKeyDown} 
+              placeholder="дд.мм.гггг" 
+            /> 
+          </div>
+          {!isValid && <div className="calendar-error-text">Неверная дата</div>} 
         </div> 
-        <div className="calendar-weekdays">{['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((day) => (<div key={day} className="calendar-weekday">{day}</div>))}</div> 
-        <div className="calendar-days"> 
+
+        <div className="calendar-weekdays-modern">
+          {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((day) => (<div key={day} className="calendar-weekday">{day}</div>))}
+        </div> 
+
+        <div className="calendar-days-modern"> 
           {Array.from({ length: startPadding }).map((_, i) => (<div key={`empty-${i}`} className="calendar-day empty"></div>))} 
           {days.map((day) => {
             const dayOfWeek = getDay(day);
             const isHoliday = isDateHoliday(day);
             const isDisabled = dayOfWeek === 0 || dayOfWeek === 6 || isHoliday;
+            const isSelected = isSameDay(day, currentDate);
+            const isToday = isSameDay(day, new Date());
             
             return ( 
               <button 
                 key={day.toString()} 
-                className={`calendar-day ${isSameDay(day, currentDate) ? 'selected' : ''} ${isSameDay(day, new Date()) ? 'today' : ''} ${isDisabled ? 'disabled' : ''}`} 
+                className={`calendar-day-modern ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''} ${isDisabled ? 'disabled' : ''}`} 
                 onClick={() => handleDayClick(day)} 
                 disabled={isDisabled}
                 title={isHoliday ? 'Каникулы' : format(day, 'd MMMM yyyy', { locale: ru })}
               >
-                {format(day, 'd')}
+                <span className="day-text">{format(day, 'd')}</span>
               </button> 
             );
           })} 
         </div> 
-        <div className="calendar-footer"> 
-          <button onClick={onClose} className="calendar-cancel-btn"><Icon name="close" />Закрыть</button> 
-          <button onClick={handleTodayClick} className="calendar-today-btn"><Icon name="today" />Сегодня</button> 
+
+        <div className="calendar-footer-modern"> 
+          <button onClick={onClose} className="calendar-btn-secondary"><Icon name="close" />Закрыть</button> 
+          <button onClick={handleTodayClick} className="calendar-btn-primary"><Icon name="today" />Сегодня</button> 
         </div> 
       </div> 
     </div> 
@@ -480,7 +478,7 @@ export function ScheduleScreen() {
   
   const [appState, setAppState] = useState(() => dataStore.getState());
 
-  // 🔥 ЛОГИКА УСТАНОВКИ (PWA)
+  // ЛОГИКА УСТАНОВКИ (PWA)
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   useEffect(() => {
@@ -559,6 +557,7 @@ export function ScheduleScreen() {
 
   const dateKey = format(selectedDate, 'yyyy-MM-dd');
 
+  // ФУНКЦИЯ ПРОКРУТКИ ТАБА В ЦЕНТР
   const scrollToActiveDay = useCallback((dayIndex: number) => {
     if (!tabsRef.current) return;
     const tabButtons = tabsRef.current.querySelectorAll('.tab-button');
@@ -567,6 +566,14 @@ export function ScheduleScreen() {
       tabElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
     }
   }, []);
+
+  // ЭФФЕКТ ДЛЯ АВТОМАТИЧЕСКОЙ ПРОКРУТКИ ПРИ КАЖДОЙ СМЕНЕ ДНЯ (И ПРИ ЗАПУСКЕ)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      scrollToActiveDay(activeDayIndex);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [activeDayIndex, scrollToActiveDay]);
 
   const showMessage = (message: string) => { setSnackbarMessage(message); setSnackbarLink(null); setShowSnackbar(true); };
 
@@ -597,7 +604,6 @@ export function ScheduleScreen() {
     try {
         const metadata = dataStore.getProfileMetadata(profileId);
 
-        // Используем отдельные запросы для стабильности
         const [schedRes, ovrRes, evsRes] = await Promise.all([
           scheduleApi.getSchedule(profileId).catch(() => null),
           scheduleApi.refreshOverrides(profileId, formattedDate).catch(() => null),
@@ -712,7 +718,6 @@ export function ScheduleScreen() {
       setActiveDayIndex(getDay(date) === 0 || getDay(date) === 6 ? 0 : getDayIndex(date));
   };
 
-  // 🔥 ОБНОВЛЕННАЯ ФУНКЦИЯ: ТОЛЬКО ОКНО С ПЕРЕХОДОМ
   const checkOverrides = () => {
     setSnackbarMessage("Проверьте актуальное расписание замен на официальном сайте ТТЖТ.");
     setSnackbarLink("https://ttgt.org/images/pdf/zamena.pdf");
@@ -756,14 +761,20 @@ export function ScheduleScreen() {
     const initializeData = async () => {
       if (hasInitialized.current) return;
       hasInitialized.current = true;
+
+      // АВТОМАТИЧЕСКИЙ СБРОС НА ТЕКУЩУЮ ДАТУ ПРИ ВХОДЕ
+      resetToToday();
+      const todayDate = new Date();
+
       const selectedId = localStorage.getItem('selectedId');
       const userType = localStorage.getItem('userType') as ProfileType;
       if (!selectedId) { navigate('/'); return; }
       if (userType && userType !== appState.lastUsed) { await dataStore.setLastUsed(userType); }
-      await loadProfileData(selectedId, userType || ProfileType.STUDENT, selectedDate);
+      
+      await loadProfileData(selectedId, userType || ProfileType.STUDENT, todayDate);
     };
     initializeData();
-  }, [navigate]);
+  }, [navigate, resetToToday]);
 
   useEffect(() => {
       if(!currentProfileId || !hasInitialized.current) return;
@@ -944,7 +955,7 @@ export function ScheduleScreen() {
         return isAllowed ? info : null;
     }
 
-    const isFirstYear = currentProfileId.includes("-1-");
+    const isFirstYear = currentProfileId.split('-')[1] === '1';
     if (isFirstYear) {
         const isAllowed = nameLower.includes('промежуточная аттестация') || nameLower.includes('каникулы');
         return isAllowed ? info : null;
@@ -999,6 +1010,185 @@ export function ScheduleScreen() {
         .tab-button.active .tab-day-name,
         .tab-button.active .tab-day-date { color: #8c67f6; opacity: 1; }
         .tab-indicator { margin-top: 4px !important; height: 3px !important; border-radius: 4px !important; }
+
+        /* 🔥 НОВЫЕ СТИЛИ ДЛЯ КРАСИВОГО КАЛЕНДАРЯ */
+        .calendar-modal-modern {
+          background: var(--color-surface);
+          width: 90%;
+          max-width: 360px;
+          border-radius: 28px;
+          padding: 24px;
+          box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+          animation: slideUp 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+          border: 1px solid var(--color-border);
+        }
+
+        .calendar-header-modern {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 20px;
+        }
+
+        .calendar-month-year {
+          font-size: 18px;
+          font-weight: 800;
+          text-transform: capitalize;
+          color: var(--color-text);
+        }
+
+        .calendar-nav-btn {
+          background: var(--color-surface-container);
+          border: none;
+          color: var(--color-text);
+          width: 40px;
+          height: 40px;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+        }
+
+        .calendar-input-section {
+          margin-bottom: 24px;
+        }
+
+        .input-modern-wrapper {
+          display: flex;
+          align-items: center;
+          background: var(--color-surface-container);
+          padding: 0 16px;
+          border-radius: 16px;
+          border: 2px solid transparent;
+          transition: all 0.2s;
+        }
+
+        .input-modern-wrapper:focus-within {
+          border-color: var(--color-primary);
+          background: var(--color-surface);
+        }
+
+        .input-modern-wrapper input {
+          background: transparent;
+          border: none;
+          color: var(--color-text);
+          padding: 14px 0;
+          font-size: 16px;
+          width: 100%;
+          outline: none;
+          font-family: 'monospace';
+          text-align: center;
+          letter-spacing: 2px;
+        }
+
+        .calendar-weekdays-modern {
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+          text-align: center;
+          margin-bottom: 12px;
+        }
+
+        .calendar-weekday {
+          font-size: 13px;
+          font-weight: 700;
+          color: var(--color-primary);
+          opacity: 0.8;
+        }
+
+        .calendar-days-modern {
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+          gap: 6px;
+          margin-bottom: 24px;
+        }
+
+        .calendar-day-modern {
+          aspect-ratio: 1;
+          border: none;
+          background: transparent;
+          color: var(--color-text);
+          border-radius: 14px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 15px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+          position: relative;
+        }
+
+        .calendar-day-modern:hover:not(.disabled) {
+          background: var(--color-surface-container);
+        }
+
+        .calendar-day-modern.today {
+          color: var(--color-primary);
+        }
+
+        .calendar-day-modern.today::after {
+          content: '';
+          position: absolute;
+          bottom: 6px;
+          width: 4px;
+          height: 4px;
+          background: var(--color-primary);
+          border-radius: 50%;
+        }
+
+        .calendar-day-modern.selected {
+          background: var(--color-primary) !important;
+          color: white !important;
+          box-shadow: 0 4px 12px rgba(140, 103, 246, 0.4);
+        }
+
+        .calendar-day-modern.disabled {
+          opacity: 0.2;
+          cursor: not-allowed;
+        }
+
+        .calendar-footer-modern {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+        }
+
+        .calendar-btn-primary, .calendar-btn-secondary {
+          padding: 14px;
+          border-radius: 16px;
+          border: none;
+          font-weight: 700;
+          font-size: 14px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          cursor: pointer;
+        }
+
+        .calendar-btn-primary {
+          background: var(--color-primary);
+          color: white;
+        }
+
+        .calendar-btn-secondary {
+          background: var(--color-surface-container);
+          color: var(--color-text);
+        }
+
+        .calendar-error-text {
+          color: #ff4444;
+          font-size: 12px;
+          text-align: center;
+          margin-top: 6px;
+          font-weight: 600;
+        }
+
+        @keyframes slideUp {
+          from { transform: translateY(20px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
       `}</style>
       <div className="container" style={{ fontFamily: 'Inter, sans-serif' }}>
         <div className="schedule-header">
@@ -1010,6 +1200,7 @@ export function ScheduleScreen() {
         </div>
         <PracticeBanner info={practiceInfo} onClick={handlePracticeClick} />
         <PracticeDetailsModal isOpen={isPracticeModalOpen} onClose={() => setIsPracticeModalOpen(false)} info={practiceInfo} />
+        
         <div id="tour-days" className={`schedule-tabs-container ${swipeLimitReached ? 'limit-reached' : ''}`} ref={tabsContainerRef}>
           <div className="schedule-tabs" ref={tabsRef}>
             {DAYS_OF_WEEK.map((day, index) => (
@@ -1023,6 +1214,7 @@ export function ScheduleScreen() {
             ))}
           </div>
         </div>
+
         <div id="tour-list" className="schedule-list" data-version={dataVersion} ref={scheduleListRef} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} style={{ touchAction: 'pan-y' }}>
           {isLoading && (<div className="loading-state"><div className="loading-spinner"></div><p>Загрузка данных...</p></div>)}
           {error && (<div className="error-state"><Icon name="error" style={{ fontSize: '24px', marginBottom: '8px' }} /><p>{error}</p><button onClick={() => window.location.reload()} style={{ marginTop: '12px', padding: '8px 16px', backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Обновить</button></div>)}
@@ -1031,7 +1223,10 @@ export function ScheduleScreen() {
         </div>
         <DropdownMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onCheckOverrides={checkOverrides} onOpenHistory={() => setIsHistoryOpen(true)} onOpenNotes={() => setIsNotesModalOpen(true)} onInstallApp={handleInstallApp} onAddCourse={() => { setIsMenuOpen(false); setIsAddCourseOpen(true); }} onStartTour={startTour} />
         <AddCourseModal isOpen={isAddCourseOpen} onClose={() => setIsAddCourseOpen(false)} activeWeek={activeWeekIndex} activeDay={activeDayIndex} schedule={fullSchedule} overrides={applyOverrides ? overrides : null} profileId={currentProfileId} />
+        
+        {/* 🔥 ИСПОЛЬЗУЕМ КРАСИВЫЙ КАЛЕНДАРЬ */}
         <CustomCalendar isOpen={isCalendarOpen} onClose={() => setIsCalendarOpen(false)} onSelectDate={handleDateSelect} currentDate={selectedDate} calendarEvents={calendarEvents} />
+        
         <NoteModal lesson={lessonToEdit} onClose={() => setEditingLessonIndex(null)} onSave={handleSaveNote} savedNote={currentLessonData.notes} savedSubgroup={currentLessonData.subgroup} />
         <Snackbar message={snackbarMessage || ''} isVisible={showSnackbar} onClose={() => { setShowSnackbar(false); setSnackbarLink(null); }} link={snackbarLink} linkText={snackbarLinkText} />
         <HistoryModal isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} history={history} isTeacherView={isTeacherView} />

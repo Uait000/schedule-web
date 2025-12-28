@@ -15,18 +15,18 @@ export const PracticeBanner: React.FC<PracticeBannerProps> = ({ info, onClick })
   const getStyleByCode = (code: string | undefined, type: string) => {
     const c = (code || '').trim().toUpperCase();
     
-    if (c === '::' || c === ':') return { accent: '#ff0000', icon: 'fact_check', label: 'Промежуточная аттестация', text: '#ffffff' }; 
-    if (c === '0') return { accent: '#92d050', icon: 'school', label: 'Учебная практика', text: '#ffffff' }; 
-    if (c === '8') return { accent: '#ffff00', icon: 'engineering', label: 'Производственная практика', text: '#000000' }; 
-    if (c === 'X' || c === 'Х') return { accent: '#ffc000', icon: 'work_history', label: 'Преддипломная практика', text: '#ffffff' }; 
-    if (c === '=') return { accent: '#00b0f0', icon: 'beach_access', label: 'Каникулы', text: '#ffffff' }; 
-    if (c === 'III') return { accent: '#7030a0', icon: 'workspace_premium', label: 'ГИА', text: '#ffffff' }; 
-    if (c === 'D' || c === 'Д') return { accent: '#e6b8af', icon: 'history_edu', label: 'Подготовка к ГИА', text: '#ffffff' }; 
+    if (c === '::' || c === ':') return { accent: '#ff0000', icon: 'fact_check', label: 'Промежуточная аттестация' }; 
+    if (c === '0') return { accent: '#92d050', icon: 'school', label: 'Учебная практика' }; 
+    if (c === '8') return { accent: '#ffff00', icon: 'engineering', label: 'Производственная практика' }; 
+    if (c === 'X' || c === 'Х') return { accent: '#ffc000', icon: 'work_history', label: 'Преддипломная практика' }; 
+    if (c === '=') return { accent: '#00b0f0', icon: 'beach_access', label: 'Каникулы' }; 
+    if (c === 'III') return { accent: '#7030a0', icon: 'workspace_premium', label: 'ГИА' }; 
+    if (c === 'D' || c === 'Д') return { accent: '#e6b8af', icon: 'history_edu', label: 'Подготовка к ГИА' }; 
     
     switch(type) {
-      case 'holiday': return { accent: '#00b0f0', icon: 'beach_access', label: 'Каникулы', text: '#ffffff' };
-      case 'attestation': return { accent: '#ff0000', icon: 'fact_check', label: 'Аттестация', text: '#ffffff' };
-      default: return { accent: '#f97316', icon: 'event_note', label: 'Событие', text: '#ffffff' };
+      case 'holiday': return { accent: '#00b0f0', icon: 'beach_access', label: 'Каникулы' };
+      case 'attestation': return { accent: '#ff0000', icon: 'fact_check', label: 'Аттестация' };
+      default: return { accent: '#f97316', icon: 'event_note', label: 'Событие' };
     }
   };
 
@@ -81,7 +81,7 @@ export const PracticeBanner: React.FC<PracticeBannerProps> = ({ info, onClick })
             display: flex;
             align-items: center;
             justify-content: space-between;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
             border: 1px solid var(--color-border);
             position: relative;
             overflow: hidden;
@@ -108,12 +108,12 @@ export const PracticeBanner: React.FC<PracticeBannerProps> = ({ info, onClick })
         .text-content { 
             display: flex; flex-direction: column; 
             justify-content: center; 
-            min-width: 0; /* Важно для работы ellipsis */
+            min-width: 0;
             flex: 1;
         }
 
         .banner-title { 
-            color: #ffffff;
+            color: var(--color-text);
             font-weight: 700; 
             font-size: 15px; 
             line-height: 1.2; 
@@ -124,7 +124,8 @@ export const PracticeBanner: React.FC<PracticeBannerProps> = ({ info, onClick })
         }
 
         .banner-dates { 
-            color: rgba(255, 255, 255, 0.65);
+            color: var(--color-text);
+            opacity: 0.6;
             font-size: 12px; 
             font-weight: 500; 
             white-space: nowrap;
@@ -132,9 +133,8 @@ export const PracticeBanner: React.FC<PracticeBannerProps> = ({ info, onClick })
             text-overflow: ellipsis;
         }
 
-        .arrow-icon { color: rgba(255, 255, 255, 0.4); font-size: 20px; flex-shrink: 0; }
+        .arrow-icon { color: var(--color-text); opacity: 0.3; font-size: 20px; flex-shrink: 0; }
 
-        /* Адаптация для маленьких телефонов */
         @media (max-width: 380px) {
             .practice-banner-container { padding: 10px 12px; }
             .icon-box { min-width: 36px; width: 36px; height: 36px; }
