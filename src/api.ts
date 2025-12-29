@@ -69,7 +69,6 @@ async function fetchApi<T>(endpoint: string, useCache: boolean = true): Promise<
     
     const data = await response.json();
     
-    // Normalize overrides if present (handles both /overrides and /info structure)
     if (data.overrides) {
         if (Array.isArray(data.overrides)) {
              data.overrides = data.overrides.map((o: any) => ({
@@ -115,6 +114,28 @@ export const scheduleApi = {
   refreshOverrides: (id: string, date?: string) => {
     const q = date ? `?date=${date}` : '';
     return fetchApi<any>(`/schedule/${encodeURIComponent(id)}/overrides${q}`, false);
+  },
+  // 🔥 НОВЫЙ МЕТОД
+postRate: async (data: any) => {
+    const response = await fetch(`${API_BASE_URL}/schedule/rate`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "Unknown error");
+      console.error('Ошибка сервера:', response.status, errorText);
+      throw new Error(`Ошибка сервера: ${response.status}`);
+    }
+
+    // Читаем тело как текст, чтобы проверить, не пустое ли оно
+    const responseText = await response.text();
+    // Если текст есть — парсим JSON, если нет — возвращаем объект заглушку
+    return responseText ? JSON.parse(responseText) : { success: true };
   }
 };
 

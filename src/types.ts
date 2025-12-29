@@ -96,3 +96,12 @@ export interface CustomCourse {
   dayIndex: number;
   lessonIndex: number;
 }
+
+// 🔥 НОВЫЙ ТИП ДЛЯ РЕЙТИНГА
+export interface Rate {
+  stars: number;
+  comment: string;
+  teacher?: string;
+  group?: string;
+  platform: string;
+}

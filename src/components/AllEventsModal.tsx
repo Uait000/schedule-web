@@ -10,13 +10,15 @@ interface AllEventsModalProps {
   onClose: () => void;
   calendarEvents: CalendarEvent[];
   onNavigateToDate: (date: Date, message: string) => void;
+  groupName?: string; // 🔥 Добавлено для отображения группы
 }
 
 export const AllEventsModal: React.FC<AllEventsModalProps> = ({ 
   isOpen, 
   onClose, 
   calendarEvents, 
-  onNavigateToDate 
+  onNavigateToDate,
+  groupName 
 }) => {
   if (!isOpen) return null;
 
@@ -47,8 +49,9 @@ export const AllEventsModal: React.FC<AllEventsModalProps> = ({
               <Calendar size={22} color="var(--color-primary)" />
             </div>
             <div>
+              {/* 🔥 Теперь группа пишется здесь */}
               <h2 className="header-title">График событий</h2>
-              <p className="header-subtitle">Семестр 2025-2026</p>
+              <p className="header-subtitle">Группа {groupName || 'загрузка...'}</p>
             </div>
           </div>
           <button className="close-circle-btn" onClick={onClose}>
@@ -106,9 +109,9 @@ export const AllEventsModal: React.FC<AllEventsModalProps> = ({
         .all-events-overlay {
           position: fixed;
           inset: 0;
-          background: rgba(0, 0, 0, 0.4);
-          backdrop-filter: blur(10px);
-          -webkit-backdrop-filter: blur(10px);
+          background: rgba(0, 0, 0, 0.6);
+          backdrop-filter: blur(15px);
+          -webkit-backdrop-filter: blur(15px);
           z-index: 10000;
           display: flex;
           align-items: center;
@@ -165,10 +168,10 @@ export const AllEventsModal: React.FC<AllEventsModalProps> = ({
 
         .header-subtitle {
           margin: 0;
-          font-size: 12px;
-          color: var(--color-text);
-          opacity: 0.5;
-          font-weight: 600;
+          font-size: 13px;
+          color: var(--color-primary);
+          opacity: 0.9;
+          font-weight: 700;
         }
 
         .close-circle-btn {
@@ -296,7 +299,6 @@ export const AllEventsModal: React.FC<AllEventsModalProps> = ({
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-        /* Кастомный скроллбар */
         .all-events-list::-webkit-scrollbar { width: 4px; }
         .all-events-list::-webkit-scrollbar-track { background: transparent; }
         .all-events-list::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 10px; }

@@ -27,7 +27,6 @@ export function normalizeLessonForApi(lesson: any): any {
     return { noLesson: {} };
   }
   
-  // Если урок уже нормализован, возвращаем его как есть
   if (lesson.commonLesson || lesson.subgroupedLesson || lesson.noLesson) return lesson;
 
   const findGroup = (obj: any): string | undefined => {
@@ -71,7 +70,6 @@ async function fetchApi<T>(endpoint: string, useCache: boolean = true): Promise<
   
   const data = await response.json();
   
-  // Нормализация расписания
   if (data.weeks) {
     data.weeks = data.weeks.map((week: any) => ({
       ...week,
@@ -82,7 +80,6 @@ async function fetchApi<T>(endpoint: string, useCache: boolean = true): Promise<
     }));
   }
 
-  // Нормализация замен
   if (data.overrides) {
     data.overrides = data.overrides.map((o: any) => ({
       ...o,
@@ -107,14 +104,21 @@ export const scheduleApi = {
     const q = date ? `?date=${date}` : '';
     return fetchApi<any>(`/schedule/${encodeURIComponent(id)}/overrides${q}`, false);
   },
-  // 🔥 Новый метод для Schedule.tsx
   getInfo: async (id: string, date: string, scheduleUpdate?: number, eventsHash?: string) => {
-    // Получаем всё параллельно для скорости
     const [schedule, overrides, events] = await Promise.all([
       scheduleApi.getSchedule(id),
       scheduleApi.refreshOverrides(id, date),
       scheduleApi.getEvents(id)
     ]);
     return { schedule, overrides, events, schedule_update: Date.now() };
+  },
+  // 🔥 НОВЫЙ МЕТОД ОТПРАВКИ РЕЙТИНГА
+  postRate: async (data: any) => {
+    const response = await fetch(`${API_BASE_URL}/schedule/rate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    return response.json();
   }
 };

@@ -18,7 +18,8 @@ import { dataStore } from '../utils/DataStore';
 import { useAppTour } from '../hooks/useAppTour';
 import { PracticeBanner } from '../components/PracticeBanner';
 import { PracticeDetailsModal } from '../components/PracticeDetailsModal';
-import { AllEventsModal } from '../components/AllEventsModal'; // 🔥 НОВЫЙ КОМПОНЕНТ
+import { AllEventsModal } from '../components/AllEventsModal'; 
+import { RateModal } from '../components/RateModal'; // 🔥 Используем импорт (убедись, что путь верный)
 import { findNextPractice, findUpcomingEvent, PracticeInfo } from '../utils/practiceUtils';
 
 interface LessonData {
@@ -347,7 +348,8 @@ function DropdownMenu({
   onOpenNotes, 
   onInstallApp,
   onOpenAllEvents,
-  onStartTour 
+  onStartTour,
+  onRateApp 
 }: { 
   isOpen: boolean; 
   onClose: () => void; 
@@ -358,6 +360,7 @@ function DropdownMenu({
   onInstallApp: () => void;
   onOpenAllEvents: () => void;
   onStartTour: () => void;
+  onRateApp: () => void; 
 }) { 
   const navigate = useNavigate(); 
   
@@ -372,6 +375,7 @@ function DropdownMenu({
     else if (action === 'notes') { onOpenNotes(); } 
     else if (action === 'install') { onInstallApp(); } 
     else if (action === 'allEvents') { onOpenAllEvents(); }
+    else if (action === 'rate') { onRateApp(); } 
     else if (action === 'changeGroup') { 
       localStorage.removeItem('selectedId'); 
       localStorage.removeItem('userType'); 
@@ -389,6 +393,7 @@ function DropdownMenu({
         <button id="menu-item-notes" className="dropdown-item" onClick={() => handleMenuClick('notes')}><Icon name="description" /><span>Мои заметки</span></button> 
         <button id="menu-item-add-course" className="dropdown-item" onClick={() => handleMenuClick('addCourse')}><Icon name="add_circle" /><span>Добавить курс</span></button> 
         <button id="menu-item-install" className="dropdown-item" onClick={() => handleMenuClick('install')} style={{ color: 'var(--color-primary)', fontWeight: '600' }}><Icon name="download" /><span>Установить приложение</span></button> 
+        <button id="menu-item-rate" className="dropdown-item" onClick={() => handleMenuClick('rate')}><Icon name="star_outline" /><span>Оценить приложение</span></button> 
         <button id="menu-item-change-group" className="dropdown-item" onClick={() => handleMenuClick('changeGroup')}><Icon name="group" /><span>Поменять группу</span></button> 
         <button id="menu-item-help" className="dropdown-item" onClick={() => handleMenuClick('help')}><Icon name="help_outline" /><span>Как пользоваться?</span></button>
         <button id="menu-item-feedback" className="dropdown-item" onClick={() => handleMenuClick('feedback')}><Icon name="feedback" /><span>Обратная связь</span></button> 
@@ -502,6 +507,7 @@ export function ScheduleScreen() {
   const [isSwitchingProfile, setIsSwitchingProfile] = useState(false);
   const [isPracticeModalOpen, setIsPracticeModalOpen] = useState(false);
   const [isAllEventsModalOpen, setIsAllEventsModalOpen] = useState(false); 
+  const [isRateModalOpen, setIsRateModalOpen] = useState(false); 
   
   const currentProfileId = localStorage.getItem('selectedId') || 'default';
   const isTeacherView = appState.lastUsed === ProfileType.TEACHER; 
@@ -512,14 +518,12 @@ export function ScheduleScreen() {
   const [isAnimating, setIsAnimating] = useState(false);
   const [swipeLimitReached, setSwipeLimitReached] = useState(false);
 
-  // 🔥 ОБЪЯВЛЯЕМ showMessage ДО ИСПОЛЬЗОВАНИЯ В ДРУГИХ ФУНКЦИЯХ
   const showMessage = useCallback((message: string) => { 
     setSnackbarMessage(message); 
     setSnackbarLink(null); 
     setShowSnackbar(true); 
   }, []);
 
-  // 🔥 ОБЪЯВЛЯЕМ handleNavigateToDate
   const handleNavigateToDate = useCallback((date: Date, message: string) => {
     setSelectedDate(date);
     const weekNum = getWeekNumber(date);
@@ -530,7 +534,6 @@ export function ScheduleScreen() {
     showMessage(message);
   }, [setSelectedDate, setActiveWeekIndex, setActiveDayIndex, showMessage]);
 
-  // 🔥 ОБЪЯВЛЯЕМ loadProfileData (используется в handleProfileSwitch)
   const loadProfileData = useCallback(async (profileId: string, profileType: ProfileType, date: Date = new Date()) => {
     if (!profileId) return;
     setIsLoading(true);
@@ -599,7 +602,6 @@ export function ScheduleScreen() {
     finally { setIsLoading(false); }
   }, [appState.profiles.student, fullSchedule, overrides]);
 
-  // 🔥 ОБЪЯВЛЯЕМ handleProfileSwitch (зависит от loadProfileData)
   const handleProfileSwitch = useCallback(async (newType: ProfileType, newProfile: any) => {
     if (isSwitchingProfile) return;
     setIsSwitchingProfile(true);
@@ -613,6 +615,53 @@ export function ScheduleScreen() {
     } catch (error) { console.error('Error switching profile:', error); showMessage('Ошибка при загрузке'); } 
     finally { setIsSwitchingProfile(false); }
   }, [isSwitchingProfile, loadProfileData, selectedDate, showMessage]);
+
+  const handleRateSubmit = async (stars: number, comment: string) => {
+    try {
+      // Формируем объект строго по схеме Егора
+      const payload = {
+        stars: Number(stars), // Гарантируем, что это целое число
+        comment: String(comment || ""), // Если комментария нет, шлем пустую строку
+        teacher: isTeacherView ? (appState.profiles.teacher?.name || "Не указан") : null,
+        group: appState.profiles.student?.name || "Не указана",
+        platform: 'web-ttgt-app' // Уникальный ID вашего приложения
+      };
+
+      console.log('Отправка оценки:', payload); // Для отладки в консоли
+
+      const response = await scheduleApi.postRate(payload);
+      
+      // Проверяем, если сервер вернул ошибку, которую мы не поймали в fetch
+      if (response && response.detail) {
+        console.error('Ошибка валидации сервера:', response.detail);
+        showMessage("Ошибка: данные не приняты сервером");
+        return;
+      }
+
+      localStorage.setItem('app_rated', 'true'); 
+      setIsRateModalOpen(false);
+      showMessage("Спасибо за оценку! ❤️");
+    } catch(e) { 
+      console.error("Критическая ошибка отправки:", e);
+      showMessage("Ошибка отправки оценки"); 
+    }
+  };
+
+  useEffect(() => {
+    const firstLaunch = localStorage.getItem('app_first_launch');
+    if (!firstLaunch) {
+        localStorage.setItem('app_first_launch', Date.now().toString());
+    } else {
+        const diff = Date.now() - parseInt(firstLaunch);
+        const sevenDays = 7 * 24 * 60 * 60 * 1000;
+        const hasRated = localStorage.getItem('app_rated');
+        
+        if (diff > sevenDays && !hasRated) {
+            const timer = setTimeout(() => setIsRateModalOpen(true), 3000);
+            return () => clearTimeout(timer);
+        }
+    }
+  }, []);
 
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
@@ -893,8 +942,8 @@ export function ScheduleScreen() {
             if (activeDayIndex === 1 && index >= 3) targetIndex = index + 1;
             if (targetIndex >= 0 && targetIndex < lessonCount) {
               if (lessonsArray[targetIndex].noLesson || Object.keys(lessonsArray[targetIndex]).length === 0) {
-                 lessonsArray[targetIndex] = { commonLesson: { name: course.name, teacher: course.teacher, room: course.room, group: course.teacher } };
-                 (lessonsArray[targetIndex] as any).customCourseId = course.id;
+                  lessonsArray[targetIndex] = { commonLesson: { name: course.name, teacher: course.teacher, room: course.room, group: course.teacher } };
+                  (lessonsArray[targetIndex] as any).customCourseId = course.id;
               }
           }
         }
@@ -1049,14 +1098,18 @@ export function ScheduleScreen() {
           {!isLoading && !error && renderLessons()}
           {!error && (<div className="overrides-toggle-container" style={{ marginTop: '16px', marginBottom: '0' }}><button className={`overrides-toggle ${applyOverrides ? 'active' : ''}`} onClick={toggleApplyOverrides} disabled={isSwitchingProfile}><Icon name="swap_horiz" /><span>Учитывать замены</span>{applyOverrides && (overrides?.overrides?.length || 0) > 0 && (<span className="overrides-badge">{overrides!.overrides.length}</span>)}</button></div>)}
         </div>
-        <DropdownMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onCheckOverrides={checkOverrides} onOpenHistory={() => setIsHistoryOpen(true)} onOpenNotes={() => setIsNotesModalOpen(true)} onInstallApp={handleInstallApp} onOpenAllEvents={() => setIsAllEventsModalOpen(true)} onStartTour={startTour} />
+        <DropdownMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onCheckOverrides={checkOverrides} onOpenHistory={() => setIsHistoryOpen(true)} onOpenNotes={() => setIsNotesModalOpen(true)} onInstallApp={handleInstallApp} onOpenAllEvents={() => setIsAllEventsModalOpen(true)} onStartTour={startTour} onRateApp={() => setIsRateModalOpen(true)} />
         <AddCourseModal isOpen={isAddCourseOpen} onClose={() => setIsAddCourseOpen(false)} activeWeek={activeWeekIndex} activeDay={activeDayIndex} schedule={fullSchedule} overrides={applyOverrides ? overrides : null} profileId={currentProfileId} />
         <CustomCalendar isOpen={isCalendarOpen} onClose={() => setIsCalendarOpen(false)} onSelectDate={handleDateSelect} currentDate={selectedDate} calendarEvents={calendarEvents} />
         <NoteModal lesson={lessonToEdit} onClose={() => setEditingLessonIndex(null)} onSave={handleSaveNote} savedNote={currentLessonData.notes} savedSubgroup={currentLessonData.subgroup} />
         <Snackbar message={snackbarMessage || ''} isVisible={showSnackbar} onClose={() => { setShowSnackbar(false); setSnackbarLink(null); }} link={snackbarLink} linkText={snackbarLinkText} />
         <HistoryModal isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} history={history} isTeacherView={isTeacherView} />
         <AllNotesModal isOpen={isNotesModalOpen} onClose={() => setIsNotesModalOpen(false)} profileId={currentProfileId} schedule={fullSchedule} />
-        <AllEventsModal isOpen={isAllEventsModalOpen} onClose={() => setIsAllEventsModalOpen(false)} calendarEvents={calendarEvents} onNavigateToDate={handleNavigateToDate} />
+        
+        <AllEventsModal isOpen={isAllEventsModalOpen} onClose={() => setIsAllEventsModalOpen(false)} calendarEvents={calendarEvents} onNavigateToDate={handleNavigateToDate} groupName={appState.profiles.student?.name} />
+        
+        <RateModal isOpen={isRateModalOpen} onClose={() => setIsRateModalOpen(false)} onSubmit={handleRateSubmit} />
+
         <div id="tour-nav-panel" className="week-switcher-container">
           <button className="back-button" onClick={() => navigate('/')} title="Назад"><Icon name="arrow_back" /></button>
           <button className="week-switcher-button" onClick={handleWeekSwitch}>
