@@ -73,26 +73,25 @@ export function RateModal({ isOpen, onClose, onSubmit }: RateModalProps) {
           left: 0;
           right: 0;
           bottom: 0;
-          background: rgba(0, 0, 0, 0.85);
+          background: rgba(0, 0, 0, 0.7);
           backdrop-filter: blur(15px);
           -webkit-backdrop-filter: blur(15px);
           z-index: 99999;
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 16px; /* Отступ от краев экрана на мобилках */
+          padding: 16px;
           animation: rateFadeIn 0.3s ease-out;
         }
 
         .rate-card {
-          background: #1c1c1e;
+          background: var(--color-surface, #1c1c1e);
           width: 100%;
           max-width: 400px;
-          /* Адаптивная ширина: не более 95% экрана на маленьких устройствах */
           width: min(400px, 95vw); 
           border-radius: 28px;
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6);
+          border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
+          box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4);
           overflow: hidden;
           animation: rateSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
         }
@@ -107,9 +106,9 @@ export function RateModal({ isOpen, onClose, onSubmit }: RateModalProps) {
 
         .rate-title {
           margin: 0 0 8px 0;
-          font-size: clamp(18px, 5vw, 24px); /* Текст уменьшается на маленьких экранах */
+          font-size: clamp(18px, 5vw, 24px);
           font-weight: 900;
-          color: #ffffff;
+          color: var(--color-text, #ffffff);
           font-family: 'Inter', sans-serif;
           letter-spacing: -0.5px;
         }
@@ -117,7 +116,8 @@ export function RateModal({ isOpen, onClose, onSubmit }: RateModalProps) {
         .rate-subtitle {
           margin: 0 0 24px 0;
           font-size: clamp(13px, 4vw, 15px);
-          color: rgba(255, 255, 255, 0.6);
+          color: var(--color-text, #ffffff);
+          opacity: 0.6;
           font-weight: 600;
         }
 
@@ -127,7 +127,7 @@ export function RateModal({ isOpen, onClose, onSubmit }: RateModalProps) {
           gap: min(10px, 2vw);
           margin-bottom: 28px;
           width: 100%;
-          flex-wrap: nowrap; /* Котики всегда в один ряд */
+          flex-wrap: nowrap;
         }
 
         .cat-item {
@@ -136,8 +136,8 @@ export function RateModal({ isOpen, onClose, onSubmit }: RateModalProps) {
           padding: 4px;
           cursor: pointer;
           transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-          filter: grayscale(1) opacity(0.2);
-          flex: 1; /* Одинаковая ширина для всех кнопок */
+          filter: grayscale(1) opacity(0.3);
+          flex: 1;
           max-width: 60px;
         }
 
@@ -147,7 +147,7 @@ export function RateModal({ isOpen, onClose, onSubmit }: RateModalProps) {
         }
 
         .cat-icon {
-          font-size: clamp(32px, 10vw, 48px); /* Скейлинг иконок */
+          font-size: clamp(32px, 10vw, 48px);
           line-height: 1;
         }
 
@@ -156,9 +156,9 @@ export function RateModal({ isOpen, onClose, onSubmit }: RateModalProps) {
           height: clamp(100px, 20vh, 140px);
           border-radius: 18px;
           padding: 16px;
-          background: rgba(255, 255, 255, 0.06);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          color: #ffffff;
+          background: var(--color-surface-container-low, rgba(255, 255, 255, 0.06));
+          border: 1px solid var(--color-border, rgba(255, 255, 255, 0.1));
+          color: var(--color-text, #ffffff);
           margin-bottom: 24px;
           resize: none;
           font-size: 15px;
@@ -180,24 +180,28 @@ export function RateModal({ isOpen, onClose, onSubmit }: RateModalProps) {
           padding: 16px;
           border-radius: 16px;
           border: none;
-          background: #8c67f6;
+          background: var(--color-primary, #8c67f6);
           color: white;
           font-weight: 800;
           font-size: 16px;
           cursor: pointer;
           transition: all 0.3s;
+          box-shadow: 0 4px 12px rgba(140, 103, 246, 0.3);
         }
 
         .btn-send:disabled {
-          background: #3a3a3c;
-          color: rgba(255, 255, 255, 0.3);
+          background: var(--color-surface-container-high, #3a3a3c);
+          color: var(--color-text, rgba(255, 255, 255, 0.3));
+          opacity: 0.5;
           cursor: not-allowed;
+          box-shadow: none;
         }
 
         .btn-later {
           background: none;
           border: none;
-          color: rgba(255, 255, 255, 0.4);
+          color: var(--color-text, #ffffff);
+          opacity: 0.4;
           font-weight: 700;
           font-size: 14px;
           padding: 10px;
@@ -206,6 +210,29 @@ export function RateModal({ isOpen, onClose, onSubmit }: RateModalProps) {
 
         @keyframes rateFadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes rateSlideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        /* Светлая тема принудительно, если переменные не подхватились автоматически */
+        @media (prefers-color-scheme: light) {
+          .rate-overlay {
+            background: rgba(255, 255, 255, 0.4);
+          }
+          .rate-card {
+            background: #ffffff;
+            border-color: rgba(0, 0, 0, 0.1);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+          }
+          .rate-title, .rate-subtitle {
+            color: #000000;
+          }
+          .rate-input {
+            background: #f2f2f7;
+            border-color: rgba(0, 0, 0, 0.1);
+            color: #000000;
+          }
+          .btn-later {
+            color: #000000;
+          }
+        }
       `}</style>
     </div>,
     document.body
