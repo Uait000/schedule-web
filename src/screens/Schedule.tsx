@@ -18,6 +18,7 @@ import { dataStore } from '../utils/DataStore';
 import { useAppTour } from '../hooks/useAppTour';
 import { PracticeBanner } from '../components/PracticeBanner';
 import { PracticeDetailsModal } from '../components/PracticeDetailsModal';
+import { AllEventsModal } from '../components/AllEventsModal'; // 🔥 НОВЫЙ КОМПОНЕНТ
 import { findNextPractice, findUpcomingEvent, PracticeInfo } from '../utils/practiceUtils';
 
 interface LessonData {
@@ -197,7 +198,6 @@ const Icon = ({ name, style = {} }: { name: string; style?: React.CSSProperties 
   <span className="material-icons" style={{ fontSize: 'inherit', verticalAlign: 'middle', ...style }}>{name}</span>
 );
 
-// 🔥 ОБНОВЛЕННЫЙ КОМПОНЕНТ КАЛЕНДАРЯ
 function CustomCalendar({ isOpen, onClose, onSelectDate, currentDate, calendarEvents }: { isOpen: boolean; onClose: () => void; onSelectDate: (date: Date) => void; currentDate: Date; calendarEvents: CalendarEvent[]; }) { 
   const [viewDate, setViewDate] = useState(currentDate); 
   const [dateInput, setDateInput] = useState(format(currentDate, 'dd.MM.yyyy')); 
@@ -346,6 +346,7 @@ function DropdownMenu({
   onAddCourse, 
   onOpenNotes, 
   onInstallApp,
+  onOpenAllEvents,
   onStartTour 
 }: { 
   isOpen: boolean; 
@@ -355,6 +356,7 @@ function DropdownMenu({
   onAddCourse: () => void; 
   onOpenNotes: () => void;
   onInstallApp: () => void;
+  onOpenAllEvents: () => void;
   onStartTour: () => void;
 }) { 
   const navigate = useNavigate(); 
@@ -369,6 +371,7 @@ function DropdownMenu({
     else if (action === 'addCourse') { onAddCourse(); } 
     else if (action === 'notes') { onOpenNotes(); } 
     else if (action === 'install') { onInstallApp(); } 
+    else if (action === 'allEvents') { onOpenAllEvents(); }
     else if (action === 'changeGroup') { 
       localStorage.removeItem('selectedId'); 
       localStorage.removeItem('userType'); 
@@ -381,6 +384,7 @@ function DropdownMenu({
     <div className="dropdown-backdrop" onClick={onClose}> 
       <div className="dropdown-menu" onClick={(e) => e.stopPropagation()}> 
         <button id="menu-item-overrides" className="dropdown-item" onClick={() => handleMenuClick('overrides')}><Icon name="sync_alt" /><span>Проверить изменения</span></button> 
+        <button id="menu-item-all-events" className="dropdown-item" onClick={() => handleMenuClick('allEvents')} style={{ color: 'var(--color-primary)', fontWeight: '700' }}><Icon name="event_repeat" /><span>График событий</span></button> 
         <button id="menu-item-history" className="dropdown-item" onClick={() => handleMenuClick('history')}><Icon name="history" /><span>История замен</span></button> 
         <button id="menu-item-notes" className="dropdown-item" onClick={() => handleMenuClick('notes')}><Icon name="description" /><span>Мои заметки</span></button> 
         <button id="menu-item-add-course" className="dropdown-item" onClick={() => handleMenuClick('addCourse')}><Icon name="add_circle" /><span>Добавить курс</span></button> 
@@ -477,49 +481,6 @@ export function ScheduleScreen() {
   const { activeDayIndex, setActiveDayIndex, activeWeekIndex, setActiveWeekIndex, applyOverrides, setApplyOverrides, selectedDate, setSelectedDate, resetToToday } = useScheduleState();
   
   const [appState, setAppState] = useState(() => dataStore.getState());
-
-  // ЛОГИКА УСТАНОВКИ (PWA)
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-
-  useEffect(() => {
-    const handler = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-    window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, []);
-
-  const handleInstallApp = async () => {
-    if (!deferredPrompt) {
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-      if (isIOS) {
-        showMessage("Нажмите кнопку 'Поделиться' в Safari и выберите 'На экран «Домой»'");
-      } else {
-        showMessage("Используйте меню браузера (три точки) -> 'Установить приложение'");
-      }
-      return;
-    }
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setDeferredPrompt(null);
-    }
-  };
-
-  useEffect(() => {
-    const unsubscribe = dataStore.subscribe((newState) => {
-      setAppState(prev => {
-          const isSame = prev.lastUsed === newState.lastUsed && 
-                        prev.profiles.student?.id === newState.profiles.student?.id &&
-                        prev.profiles.teacher?.id === newState.profiles.teacher?.id;
-          if (isSame) return prev;
-          return newState;
-      });
-    });
-    return () => unsubscribe();
-  }, []);
-  
   const [fullSchedule, setFullSchedule] = useState<Schedule | null>(null);
   const [displaySchedule, setDisplaySchedule] = useState<Schedule | null>(null);
   const [overrides, setOverrides] = useState<OverridesResponse | null>(null);
@@ -540,6 +501,7 @@ export function ScheduleScreen() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isSwitchingProfile, setIsSwitchingProfile] = useState(false);
   const [isPracticeModalOpen, setIsPracticeModalOpen] = useState(false);
+  const [isAllEventsModalOpen, setIsAllEventsModalOpen] = useState(false); 
   
   const currentProfileId = localStorage.getItem('selectedId') || 'default';
   const isTeacherView = appState.lastUsed === ProfileType.TEACHER; 
@@ -550,65 +512,46 @@ export function ScheduleScreen() {
   const [isAnimating, setIsAnimating] = useState(false);
   const [swipeLimitReached, setSwipeLimitReached] = useState(false);
 
-  const { startTour } = useAppTour({
-    isReady: !isLoading && !!fullSchedule,
-    setIsMenuOpen
-  });
-
-  const dateKey = format(selectedDate, 'yyyy-MM-dd');
-
-  // ФУНКЦИЯ ПРОКРУТКИ ТАБА В ЦЕНТР
-  const scrollToActiveDay = useCallback((dayIndex: number) => {
-    if (!tabsRef.current) return;
-    const tabButtons = tabsRef.current.querySelectorAll('.tab-button');
-    if (tabButtons[dayIndex]) {
-      const tabElement = tabButtons[dayIndex] as HTMLElement;
-      tabElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-    }
+  // 🔥 ОБЪЯВЛЯЕМ showMessage ДО ИСПОЛЬЗОВАНИЯ В ДРУГИХ ФУНКЦИЯХ
+  const showMessage = useCallback((message: string) => { 
+    setSnackbarMessage(message); 
+    setSnackbarLink(null); 
+    setShowSnackbar(true); 
   }, []);
 
-  // ЭФФЕКТ ДЛЯ АВТОМАТИЧЕСКОЙ ПРОКРУТКИ ПРИ КАЖДОЙ СМЕНЕ ДНЯ (И ПРИ ЗАПУСКЕ)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      scrollToActiveDay(activeDayIndex);
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [activeDayIndex, scrollToActiveDay]);
+  // 🔥 ОБЪЯВЛЯЕМ handleNavigateToDate
+  const handleNavigateToDate = useCallback((date: Date, message: string) => {
+    setSelectedDate(date);
+    const weekNum = getWeekNumber(date);
+    setActiveWeekIndex(weekNum);
+    const dayOfWeek = getDay(date);
+    const dayIdx = dayOfWeek === 0 || dayOfWeek === 6 ? 0 : getDayIndex(date);
+    setActiveDayIndex(dayIdx);
+    showMessage(message);
+  }, [setSelectedDate, setActiveWeekIndex, setActiveDayIndex, showMessage]);
 
-  const showMessage = (message: string) => { setSnackbarMessage(message); setSnackbarLink(null); setShowSnackbar(true); };
-
-  const handleAddProfile = () => { navigate('/', { state: { fromAddProfile: true } }); };
-
-  const handleProfileSwitch = async (newType: ProfileType, newProfile: any) => {
-    if (isSwitchingProfile) return;
-    setIsSwitchingProfile(true);
-    try {
-      await dataStore.setLastUsed(newType);
-      localStorage.setItem('selectedId', newProfile.id);
-      localStorage.setItem('userType', newType);
-      
-      window.dispatchEvent(new Event('profileChanged'));
-      
-      await loadProfileData(newProfile.id, newType, selectedDate);
-      showMessage(`Переключено на: ${newProfile.name}`);
-    } catch (error) { console.error('Error switching profile:', error); showMessage('Ошибка при загрузке'); } 
-    finally { setIsSwitchingProfile(false); }
-  };
-
-  const loadProfileData = async (profileId: string, profileType: ProfileType, date: Date = new Date()) => {
+  // 🔥 ОБЪЯВЛЯЕМ loadProfileData (используется в handleProfileSwitch)
+  const loadProfileData = useCallback(async (profileId: string, profileType: ProfileType, date: Date = new Date()) => {
     if (!profileId) return;
     setIsLoading(true);
     setError(null);
     const formattedDate = format(date, 'yyyy-MM-dd');
-    
     try {
         const metadata = dataStore.getProfileMetadata(profileId);
-
         const [schedRes, ovrRes, evsRes] = await Promise.all([
           scheduleApi.getSchedule(profileId).catch(() => null),
           scheduleApi.refreshOverrides(profileId, formattedDate).catch(() => null),
           scheduleApi.getEvents(profileId).catch(() => null)
         ]);
+
+        let finalEvents = evsRes?.events || evsRes || [];
+        if (profileType === ProfileType.TEACHER) {
+            const linkedStudentId = appState.profiles.student?.id;
+            if (linkedStudentId) {
+                const groupEvents = await scheduleApi.getEvents(linkedStudentId).catch(() => null);
+                if (groupEvents) finalEvents = groupEvents.events || groupEvents;
+            }
+        }
 
         if (schedRes) {
             let normalizedSchedule = schedRes;
@@ -625,16 +568,10 @@ export function ScheduleScreen() {
              }
             setFullSchedule(normalizedSchedule);
         }
-
-        if (evsRes) {
-            const evs = evsRes.events || evsRes;
-            setCalendarEvents(evs);
-            dataStore.updateProfileMetadata(profileId, { 
-                events: evs,
-                eventsHash: evsRes.sha256 
-            });
+        if (finalEvents) {
+            setCalendarEvents(finalEvents);
+            dataStore.updateProfileMetadata(profileId, { events: finalEvents, eventsHash: evsRes?.sha256 || "" });
         }
-
         if (ovrRes) {
             const normalizedOverrides = {
                 ...ovrRes,
@@ -646,7 +583,6 @@ export function ScheduleScreen() {
             };
             setOverrides(normalizedOverrides);
         }
-
         await dataStore.updateData(s => ({
             ...s,
             profiles: {
@@ -659,12 +595,90 @@ export function ScheduleScreen() {
                 }
             }
         }));
+    } catch (err) { console.error("Load Error:", err); if (!fullSchedule) setError('Ошибка сервера.'); } 
+    finally { setIsLoading(false); }
+  }, [appState.profiles.student, fullSchedule, overrides]);
 
-    } catch (err) { 
-        console.error("Load Error:", err); 
-        if (!fullSchedule) setError('Ошибка сервера. Попробуйте позже.'); 
-    } finally { setIsLoading(false); }
-  };
+  // 🔥 ОБЪЯВЛЯЕМ handleProfileSwitch (зависит от loadProfileData)
+  const handleProfileSwitch = useCallback(async (newType: ProfileType, newProfile: any) => {
+    if (isSwitchingProfile) return;
+    setIsSwitchingProfile(true);
+    try {
+      await dataStore.setLastUsed(newType);
+      localStorage.setItem('selectedId', newProfile.id);
+      localStorage.setItem('userType', newType);
+      window.dispatchEvent(new Event('profileChanged'));
+      await loadProfileData(newProfile.id, newType, selectedDate);
+      showMessage(`Переключено на: ${newProfile.name}`);
+    } catch (error) { console.error('Error switching profile:', error); showMessage('Ошибка при загрузке'); } 
+    finally { setIsSwitchingProfile(false); }
+  }, [isSwitchingProfile, loadProfileData, selectedDate, showMessage]);
+
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallApp = useCallback(async () => {
+    if (!deferredPrompt) {
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+      if (isIOS) {
+        showMessage("Нажмите кнопку 'Поделиться' в Safari и выберите 'На экран «Домой»'");
+      } else {
+        showMessage("Используйте меню браузера (три точки) -> 'Установить приложение'");
+      }
+      return;
+    }
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
+  }, [deferredPrompt, showMessage]);
+
+  const { startTour } = useAppTour({
+    isReady: !isLoading && !!fullSchedule,
+    setIsMenuOpen
+  });
+
+  const dateKey = format(selectedDate, 'yyyy-MM-dd');
+
+  const scrollToActiveDay = useCallback((dayIndex: number) => {
+    if (!tabsRef.current) return;
+    const tabButtons = tabsRef.current.querySelectorAll('.tab-button');
+    if (tabButtons[dayIndex]) {
+      const tabElement = tabButtons[dayIndex] as HTMLElement;
+      tabElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      scrollToActiveDay(activeDayIndex);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [activeDayIndex, scrollToActiveDay]);
+
+  useEffect(() => {
+    const unsubscribe = dataStore.subscribe((newState) => {
+      setAppState(prev => {
+          const isSame = prev.lastUsed === newState.lastUsed && 
+                        prev.profiles.student?.id === newState.profiles.student?.id &&
+                        prev.profiles.teacher?.id === newState.profiles.teacher?.id;
+          if (isSame) return prev;
+          return newState;
+      });
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleAddProfile = () => { navigate('/', { state: { fromAddProfile: true } }); };
 
   const handleTouchStart = (e: React.TouchEvent) => { setTouchStart(e.targetTouches[0].clientX); setSwipeLimitReached(false); };
   const handleTouchMove = (e: React.TouchEvent) => { setTouchEnd(e.targetTouches[0].clientX); };
@@ -675,14 +689,12 @@ export function ScheduleScreen() {
     if (Math.abs(distance) > 50) {
         setIsAnimating(true);
         const newIndex = distance > 0 ? activeDayIndex + 1 : activeDayIndex - 1;
-        
         if (newIndex > 4 || newIndex < 0) {
             setSwipeLimitReached(true);
             scheduleListRef.current?.classList.add('swipe-limit');
             setTimeout(() => { scheduleListRef.current?.classList.remove('swipe-limit'); setIsAnimating(false); }, 500);
             return;
         }
-
         scheduleListRef.current?.classList.add(distance > 0 ? 'slide-left' : 'slide-right');
         setTimeout(() => {
              setActiveDayIndex(newIndex);
@@ -761,20 +773,16 @@ export function ScheduleScreen() {
     const initializeData = async () => {
       if (hasInitialized.current) return;
       hasInitialized.current = true;
-
-      // АВТОМАТИЧЕСКИЙ СБРОС НА ТЕКУЩУЮ ДАТУ ПРИ ВХОДЕ
       resetToToday();
       const todayDate = new Date();
-
       const selectedId = localStorage.getItem('selectedId');
       const userType = localStorage.getItem('userType') as ProfileType;
       if (!selectedId) { navigate('/'); return; }
       if (userType && userType !== appState.lastUsed) { await dataStore.setLastUsed(userType); }
-      
       await loadProfileData(selectedId, userType || ProfileType.STUDENT, todayDate);
     };
     initializeData();
-  }, [navigate, resetToToday]);
+  }, [navigate, resetToToday, loadProfileData, appState.lastUsed]);
 
   useEffect(() => {
       if(!currentProfileId || !hasInitialized.current) return;
@@ -803,16 +811,13 @@ export function ScheduleScreen() {
     if (!fullSchedule) { setDisplaySchedule(null); return; }
     const newSchedule = JSON.parse(JSON.stringify(fullSchedule)) as Schedule;
     const currentWeekData = newSchedule.weeks?.[activeWeekIndex % 2];
-    
     if (!currentWeekData) { setDisplaySchedule(newSchedule); return; }
-
     const blockingEvent = calendarEvents.find(event => {
         if (event.type === 'attestation' || event.type === 'holiday') return false; 
         const start = startOfDay(parseISO(event.dateStart));
         const end = endOfDay(parseISO(event.dateEnd));
         return isWithinInterval(selectedDate, { start, end });
     });
-
     if (blockingEvent) {
          const day = currentWeekData.days[activeDayIndex];
          if (day && day.lessons) {
@@ -823,12 +828,9 @@ export function ScheduleScreen() {
          setDisplaySchedule(newSchedule);
          return; 
     }
-
     if (!applyOverrides || !overrides) { setDisplaySchedule(newSchedule); return; }
-    
     const isAttestation = overrides.practiceCode === '::' || overrides.practiceCode === ':';
     const isHoliday = overrides.practiceCode === '=' || overrides.practiceCode === '*';
-    
     if (overrides.isPractice && overrides.isBlocking && !isAttestation && !isHoliday) {
         const day = currentWeekData.days[activeDayIndex];
         if (day && day.lessons) {
@@ -838,7 +840,6 @@ export function ScheduleScreen() {
             day.lessons = day.lessons.map(() => practicePlaceholder);
         }
     }
-
     const { overrides: overrideList } = overrides;
     if (overrideList && overrideList.length > 0) {
       const day = currentWeekData.days[activeDayIndex];
@@ -875,7 +876,6 @@ export function ScheduleScreen() {
   const lessonsToShow = useMemo(() => {
      const weekData = displaySchedule?.weeks?.[activeWeekIndex % 2];
      const baseLessons = weekData?.days?.[activeDayIndex]?.lessons;
-     
      const lessonCount = activeDayIndex === 1 ? 6 : 5;
      const lessonsArray = Array.from({ length: lessonCount }, (_, i) => {
          if (activeDayIndex === 1) {
@@ -884,7 +884,6 @@ export function ScheduleScreen() {
              else { const baseIndex = i - 1; return (baseLessons && baseLessons[baseIndex]) ? baseLessons[baseIndex] : { noLesson: {} }; }
          } else { return (baseLessons && baseLessons[i]) ? baseLessons[i] : { noLesson: {} }; }
      });
-     
      const myCourses = appState.customCourses.filter(c => c.weekIndex === activeWeekIndex && c.dayIndex === activeDayIndex && c.profileId === currentProfileId);
      myCourses.sort((a, b) => a.lessonIndex - b.lessonIndex);
      myCourses.forEach(course => {
@@ -922,6 +921,28 @@ export function ScheduleScreen() {
 
   const practiceInfo = useMemo<PracticeInfo | null>(() => {
     let info: PracticeInfo | null = null;
+    if (isTeacherView) {
+        const linkedStudentId = appState.profiles.student?.id;
+        if (linkedStudentId) {
+            const activeEvent = calendarEvents.find(ev => {
+                const start = startOfDay(parseISO(ev.dateStart));
+                const end = endOfDay(parseISO(ev.dateEnd));
+                return isWithinInterval(selectedDate, { start, end });
+            });
+            if (activeEvent) {
+                return {
+                    name: `${appState.profiles.student?.name}: ${activeEvent.title}`,
+                    type: activeEvent.type as any,
+                    code: activeEvent.code,
+                    dateStart: parseISO(activeEvent.dateStart),
+                    dateEnd: parseISO(activeEvent.dateEnd),
+                    daysUntil: 0,
+                    isActive: true,
+                    returnDate: addDays(parseISO(activeEvent.dateEnd), 1)
+                };
+            }
+        }
+    }
     const upcomingHoliday = findUpcomingEvent(calendarEvents, selectedDate, 4);
     if (upcomingHoliday) {
         info = upcomingHoliday;
@@ -942,27 +963,19 @@ export function ScheduleScreen() {
     } else {
        info = findNextPractice(displaySchedule, activeWeekIndex, selectedDate);
     }
-
     if (!info) return null;
     const nameLower = info.name.toLowerCase();
-
     if (isTeacherView) {
-        const isAllowed = 
-            nameLower.includes('промежуточная аттестация') || 
-            nameLower.includes('каникулы') || 
-            nameLower.includes('государственная итоговая аттестация') || 
-            nameLower.includes('подготовка к государственной итоговой аттестации');
+        const isAllowed = nameLower.includes('промежуточная аттестация') || nameLower.includes('каникулы') || nameLower.includes('государственная итоговая аттестация') || nameLower.includes('подготовка к государственной итоговой аттестации');
         return isAllowed ? info : null;
     }
-
-    const isFirstYear = currentProfileId.split('-')[1] === '1';
+    const isFirstYear = currentProfileId.includes("-1-");
     if (isFirstYear) {
         const isAllowed = nameLower.includes('промежуточная аттестация') || nameLower.includes('каникулы');
         return isAllowed ? info : null;
     }
-
     return info;
-  }, [calendarEvents, selectedDate.getTime(), overrides, displaySchedule, activeWeekIndex, isTeacherView, currentProfileId]);
+  }, [calendarEvents, selectedDate, overrides, displaySchedule, activeWeekIndex, isTeacherView, currentProfileId, appState.profiles.student]);
 
   const handlePracticeClick = () => { if (practiceInfo) setIsPracticeModalOpen(true); };
 
@@ -976,219 +989,36 @@ export function ScheduleScreen() {
       <style>{` 
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Material+Icons&display=block'); 
-
-        :root {
-          font-family: 'Inter', sans-serif !important;
-        }
-
+        :root { font-family: 'Inter', sans-serif !important; }
         .calendar-day.disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; background: rgba(255,255,255,0.05); }
-        
-        .tab-button-content { 
-          display: flex; 
-          flex-direction: column; 
-          align-items: center; 
-          gap: 1px; 
-          padding: 4px 0;
-          font-family: 'Inter', sans-serif;
-        }
-
-        .tab-day-name { 
-          font-size: 14px; 
-          font-weight: 700; 
-          color: var(--color-text);
-          opacity: 0.6;
-        }
-
-        .tab-day-date { 
-          font-size: 14px; 
-          font-weight: 700; 
-          color: var(--color-text); 
-          white-space: nowrap; 
-          opacity: 0.6;
-        }
-
-        .tab-button.active .tab-day-name,
-        .tab-button.active .tab-day-date { color: #8c67f6; opacity: 1; }
+        .tab-button-content { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 0; font-family: 'Inter', sans-serif; }
+        .tab-day-name { font-size: 14px; font-weight: 700; color: var(--color-text); opacity: 0.6; }
+        .tab-day-date { font-size: 14px; font-weight: 700; color: var(--color-text); white-space: nowrap; opacity: 0.6; }
+        .tab-button.active .tab-day-name, .tab-button.active .tab-day-date { color: #8c67f6; opacity: 1; }
         .tab-indicator { margin-top: 4px !important; height: 3px !important; border-radius: 4px !important; }
-
-        /* 🔥 НОВЫЕ СТИЛИ ДЛЯ КРАСИВОГО КАЛЕНДАРЯ */
-        .calendar-modal-modern {
-          background: var(--color-surface);
-          width: 90%;
-          max-width: 360px;
-          border-radius: 28px;
-          padding: 24px;
-          box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-          animation: slideUp 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
-          border: 1px solid var(--color-border);
-        }
-
-        .calendar-header-modern {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 20px;
-        }
-
-        .calendar-month-year {
-          font-size: 18px;
-          font-weight: 800;
-          text-transform: capitalize;
-          color: var(--color-text);
-        }
-
-        .calendar-nav-btn {
-          background: var(--color-surface-container);
-          border: none;
-          color: var(--color-text);
-          width: 40px;
-          height: 40px;
-          border-radius: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-        }
-
-        .calendar-input-section {
-          margin-bottom: 24px;
-        }
-
-        .input-modern-wrapper {
-          display: flex;
-          align-items: center;
-          background: var(--color-surface-container);
-          padding: 0 16px;
-          border-radius: 16px;
-          border: 2px solid transparent;
-          transition: all 0.2s;
-        }
-
-        .input-modern-wrapper:focus-within {
-          border-color: var(--color-primary);
-          background: var(--color-surface);
-        }
-
-        .input-modern-wrapper input {
-          background: transparent;
-          border: none;
-          color: var(--color-text);
-          padding: 14px 0;
-          font-size: 16px;
-          width: 100%;
-          outline: none;
-          font-family: 'monospace';
-          text-align: center;
-          letter-spacing: 2px;
-        }
-
-        .calendar-weekdays-modern {
-          display: grid;
-          grid-template-columns: repeat(7, 1fr);
-          text-align: center;
-          margin-bottom: 12px;
-        }
-
-        .calendar-weekday {
-          font-size: 13px;
-          font-weight: 700;
-          color: var(--color-primary);
-          opacity: 0.8;
-        }
-
-        .calendar-days-modern {
-          display: grid;
-          grid-template-columns: repeat(7, 1fr);
-          gap: 6px;
-          margin-bottom: 24px;
-        }
-
-        .calendar-day-modern {
-          aspect-ratio: 1;
-          border: none;
-          background: transparent;
-          color: var(--color-text);
-          border-radius: 14px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 15px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s;
-          position: relative;
-        }
-
-        .calendar-day-modern:hover:not(.disabled) {
-          background: var(--color-surface-container);
-        }
-
-        .calendar-day-modern.today {
-          color: var(--color-primary);
-        }
-
-        .calendar-day-modern.today::after {
-          content: '';
-          position: absolute;
-          bottom: 6px;
-          width: 4px;
-          height: 4px;
-          background: var(--color-primary);
-          border-radius: 50%;
-        }
-
-        .calendar-day-modern.selected {
-          background: var(--color-primary) !important;
-          color: white !important;
-          box-shadow: 0 4px 12px rgba(140, 103, 246, 0.4);
-        }
-
-        .calendar-day-modern.disabled {
-          opacity: 0.2;
-          cursor: not-allowed;
-        }
-
-        .calendar-footer-modern {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 12px;
-        }
-
-        .calendar-btn-primary, .calendar-btn-secondary {
-          padding: 14px;
-          border-radius: 16px;
-          border: none;
-          font-weight: 700;
-          font-size: 14px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          cursor: pointer;
-        }
-
-        .calendar-btn-primary {
-          background: var(--color-primary);
-          color: white;
-        }
-
-        .calendar-btn-secondary {
-          background: var(--color-surface-container);
-          color: var(--color-text);
-        }
-
-        .calendar-error-text {
-          color: #ff4444;
-          font-size: 12px;
-          text-align: center;
-          margin-top: 6px;
-          font-weight: 600;
-        }
-
-        @keyframes slideUp {
-          from { transform: translateY(20px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
+        .calendar-modal-modern { background: var(--color-surface); width: 90%; max-width: 360px; border-radius: 28px; padding: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); animation: slideUp 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); border: 1px solid var(--color-border); }
+        .calendar-header-modern { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .calendar-month-year { font-size: 18px; font-weight: 800; text-transform: capitalize; color: var(--color-text); }
+        .calendar-nav-btn { background: var(--color-surface-container); border: none; color: var(--color-text); width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .calendar-input-section { margin-bottom: 24px; }
+        .input-modern-wrapper { display: flex; align-items: center; background: var(--color-surface-container); padding: 0 16px; border-radius: 16px; border: 2px solid transparent; transition: all 0.2s; }
+        .input-modern-wrapper:focus-within { border-color: var(--color-primary); background: var(--color-surface); }
+        .input-modern-wrapper input { background: transparent; border: none; color: var(--color-text); padding: 14px 0; font-size: 16px; width: 100%; outline: none; font-family: 'monospace'; text-align: center; letter-spacing: 2px; }
+        .calendar-weekdays-modern { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; margin-bottom: 12px; }
+        .calendar-weekday { font-size: 13px; font-weight: 700; color: var(--color-primary); opacity: 0.8; }
+        .calendar-days-modern { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 24px; }
+        .calendar-day-modern { aspect-ratio: 1; border: none; background: transparent; color: var(--color-text); border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s; position: relative; }
+        .calendar-day-modern:hover:not(.disabled) { background: var(--color-surface-container); }
+        .calendar-day-modern.today { color: var(--color-primary); }
+        .calendar-day-modern.today::after { content: ''; position: absolute; bottom: 6px; width: 4px; height: 4px; background: var(--color-primary); border-radius: 50%; }
+        .calendar-day-modern.selected { background: var(--color-primary) !important; color: white !important; box-shadow: 0 4px 12px rgba(140, 103, 246, 0.4); }
+        .calendar-day-modern.disabled { opacity: 0.2; cursor: not-allowed; }
+        .calendar-footer-modern { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .calendar-btn-primary, .calendar-btn-secondary { padding: 14px; border-radius: 16px; border: none; font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; }
+        .calendar-btn-primary { background: var(--color-primary); color: white; }
+        .calendar-btn-secondary { background: var(--color-surface-container); color: var(--color-text); }
+        .calendar-error-text { color: #ff4444; font-size: 12px; text-align: center; margin-top: 6px; font-weight: 600; }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
       `}</style>
       <div className="container" style={{ fontFamily: 'Inter, sans-serif' }}>
         <div className="schedule-header">
@@ -1199,8 +1029,7 @@ export function ScheduleScreen() {
             <ProfileSwitcher key={appState.lastUsed} profiles={appState.profiles} currentProfileType={appState.lastUsed} onSwitch={handleProfileSwitch} onAddProfile={handleAddProfile} isLoading={isSwitchingProfile} />
         </div>
         <PracticeBanner info={practiceInfo} onClick={handlePracticeClick} />
-        <PracticeDetailsModal isOpen={isPracticeModalOpen} onClose={() => setIsPracticeModalOpen(false)} info={practiceInfo} />
-        
+        <PracticeDetailsModal isOpen={isPracticeModalOpen} onClose={() => setIsPracticeModalOpen(false)} info={practiceInfo} currentProfileId={currentProfileId} calendarEvents={calendarEvents} onNavigateToDate={handleNavigateToDate} />
         <div id="tour-days" className={`schedule-tabs-container ${swipeLimitReached ? 'limit-reached' : ''}`} ref={tabsContainerRef}>
           <div className="schedule-tabs" ref={tabsRef}>
             {DAYS_OF_WEEK.map((day, index) => (
@@ -1214,23 +1043,20 @@ export function ScheduleScreen() {
             ))}
           </div>
         </div>
-
         <div id="tour-list" className="schedule-list" data-version={dataVersion} ref={scheduleListRef} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} style={{ touchAction: 'pan-y' }}>
           {isLoading && (<div className="loading-state"><div className="loading-spinner"></div><p>Загрузка данных...</p></div>)}
           {error && (<div className="error-state"><Icon name="error" style={{ fontSize: '24px', marginBottom: '8px' }} /><p>{error}</p><button onClick={() => window.location.reload()} style={{ marginTop: '12px', padding: '8px 16px', backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Обновить</button></div>)}
           {!isLoading && !error && renderLessons()}
           {!error && (<div className="overrides-toggle-container" style={{ marginTop: '16px', marginBottom: '0' }}><button className={`overrides-toggle ${applyOverrides ? 'active' : ''}`} onClick={toggleApplyOverrides} disabled={isSwitchingProfile}><Icon name="swap_horiz" /><span>Учитывать замены</span>{applyOverrides && (overrides?.overrides?.length || 0) > 0 && (<span className="overrides-badge">{overrides!.overrides.length}</span>)}</button></div>)}
         </div>
-        <DropdownMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onCheckOverrides={checkOverrides} onOpenHistory={() => setIsHistoryOpen(true)} onOpenNotes={() => setIsNotesModalOpen(true)} onInstallApp={handleInstallApp} onAddCourse={() => { setIsMenuOpen(false); setIsAddCourseOpen(true); }} onStartTour={startTour} />
+        <DropdownMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onCheckOverrides={checkOverrides} onOpenHistory={() => setIsHistoryOpen(true)} onOpenNotes={() => setIsNotesModalOpen(true)} onInstallApp={handleInstallApp} onOpenAllEvents={() => setIsAllEventsModalOpen(true)} onStartTour={startTour} />
         <AddCourseModal isOpen={isAddCourseOpen} onClose={() => setIsAddCourseOpen(false)} activeWeek={activeWeekIndex} activeDay={activeDayIndex} schedule={fullSchedule} overrides={applyOverrides ? overrides : null} profileId={currentProfileId} />
-        
-        {/* 🔥 ИСПОЛЬЗУЕМ КРАСИВЫЙ КАЛЕНДАРЬ */}
         <CustomCalendar isOpen={isCalendarOpen} onClose={() => setIsCalendarOpen(false)} onSelectDate={handleDateSelect} currentDate={selectedDate} calendarEvents={calendarEvents} />
-        
         <NoteModal lesson={lessonToEdit} onClose={() => setEditingLessonIndex(null)} onSave={handleSaveNote} savedNote={currentLessonData.notes} savedSubgroup={currentLessonData.subgroup} />
         <Snackbar message={snackbarMessage || ''} isVisible={showSnackbar} onClose={() => { setShowSnackbar(false); setSnackbarLink(null); }} link={snackbarLink} linkText={snackbarLinkText} />
         <HistoryModal isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} history={history} isTeacherView={isTeacherView} />
         <AllNotesModal isOpen={isNotesModalOpen} onClose={() => setIsNotesModalOpen(false)} profileId={currentProfileId} schedule={fullSchedule} />
+        <AllEventsModal isOpen={isAllEventsModalOpen} onClose={() => setIsAllEventsModalOpen(false)} calendarEvents={calendarEvents} onNavigateToDate={handleNavigateToDate} />
         <div id="tour-nav-panel" className="week-switcher-container">
           <button className="back-button" onClick={() => navigate('/')} title="Назад"><Icon name="arrow_back" /></button>
           <button className="week-switcher-button" onClick={handleWeekSwitch}>
