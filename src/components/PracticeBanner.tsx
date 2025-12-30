@@ -20,6 +20,7 @@ export const PracticeBanner: React.FC<PracticeBannerProps> = ({ info, onClick })
     if (c === '8') return { accent: '#ffff00', icon: 'engineering', label: 'Производственная практика' }; 
     if (c === 'X' || c === 'Х') return { accent: '#ffc000', icon: 'work_history', label: 'Преддипломная практика' }; 
     if (c === '=') return { accent: '#00b0f0', icon: 'beach_access', label: 'Каникулы' }; 
+    if (c === 'ОВС') return { accent: '#ff6600', icon: 'military_tech', label: 'Учебные сборы по ОВС' }; // 🔥 Добавлено ОВС
     if (c === 'III') return { accent: '#7030a0', icon: 'workspace_premium', label: 'ГИА' }; 
     if (c === 'D' || c === 'Д') return { accent: '#e6b8af', icon: 'history_edu', label: 'Подготовка к ГИА' }; 
     

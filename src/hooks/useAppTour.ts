@@ -5,9 +5,11 @@ import 'driver.js/dist/driver.css';
 interface UseAppTourProps {
   isReady: boolean;
   setIsMenuOpen: (isOpen: boolean) => void;
+  // Добавлен новый необязательный параметр для контроля автозапуска
+  autoStart?: boolean; 
 }
 
-export function useAppTour({ isReady, setIsMenuOpen }: UseAppTourProps) {
+export function useAppTour({ isReady, setIsMenuOpen, autoStart = false }: UseAppTourProps) {
   const driverObj = useRef(
     driver({
       showProgress: true,
@@ -103,22 +105,35 @@ export function useAppTour({ isReady, setIsMenuOpen }: UseAppTourProps) {
   );
 
   useEffect(() => {
-    if (!isReady) return;
+    // Если данные не готовы или параметр autoStart выключен — ничего не делаем
+    if (!isReady || autoStart !== true) {
+        return;
+    }
 
-    // 🔥 v13 - Новый ключ для перезапуска
+    // Проверка, был ли тур завершен ранее (для тех случаев, когда autoStart: true)
     const tourCompleted = localStorage.getItem('app_tour_completed_v13');
 
     if (!tourCompleted) {
-      setTimeout(() => {
+      const driveTimer = setTimeout(() => {
+        // Запуск только если все условия соблюдены
         driverObj.current.drive();
         localStorage.setItem('app_tour_completed_v13', 'true');
       }, 1500);
+      
+      // Очистка таймера при размонтировании
+      return () => clearTimeout(driveTimer);
     }
-  }, [isReady]);
+  }, [isReady, autoStart]);
 
   const startTour = () => {
+    // Принудительное закрытие меню перед запуском
     setIsMenuOpen(false);
-    setTimeout(() => driverObj.current.drive(), 300);
+    // Небольшая задержка для плавности анимации закрытия меню
+    const manualTimer = setTimeout(() => {
+        driverObj.current.drive();
+    }, 300);
+    
+    return () => clearTimeout(manualTimer);
   };
 
   return { startTour };

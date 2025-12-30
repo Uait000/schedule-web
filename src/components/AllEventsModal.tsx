@@ -36,6 +36,7 @@ export const AllEventsModal: React.FC<AllEventsModalProps> = ({
     if (type === 'holiday' || c === '=') return { color: '#0ea5e9', bg: 'rgba(14, 165, 233, 0.12)', label: 'Отдых' };
     if (type === 'attestation' || c === '::' || c === ':') return { color: '#ff4444', bg: 'rgba(255, 68, 68, 0.12)', label: 'Экзамены' };
     if (c === 'III' || c === 'D' || c === 'Д') return { color: '#a855f7', bg: 'rgba(168, 85, 247, 0.12)', label: 'ГИА' };
+    if (c === 'ОВС') return { color: '#ff6600', bg: 'rgba(255, 102, 0, 0.12)', label: 'Сборы' }; // 🔥 Добавлено ОВС
     return { color: '#92d050', bg: 'rgba(146, 208, 80, 0.12)', label: 'Практика' };
   };
 

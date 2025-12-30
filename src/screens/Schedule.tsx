@@ -470,7 +470,7 @@ function Snackbar({ message, isVisible, onClose, link, linkText }: { message: st
         </div>
         <div style={{ textAlign: 'center', fontSize: '14px', lineHeight: '1.4' }}>{message}</div>
       </div>
-      {link && (<div style={{ padding: '12px 20px' }}><button onClick={handleLinkClick} style={{ backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', borderRadius: '10px', padding: '10px 16px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', width: '100%', transition: 'all 0.2s ease', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="open_in_new" style={{ fontSize: '18px', marginRight: '8px' }} />{linkText || 'Посмотреть на сайте'}</button></div>)}
+      {link && (<div style={{ padding: '12px 20px' }}><button handleLinkClick={handleLinkClick} style={{ backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', borderRadius: '10px', padding: '10px 16px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', width: '100%', transition: 'all 0.2s ease', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="open_in_new" style={{ fontSize: '18px', marginRight: '8px' }} />{linkText || 'Посмотреть на сайте'}</button></div>)}
     </div> 
   ); 
 }
@@ -691,9 +691,11 @@ export function ScheduleScreen() {
     }
   }, [deferredPrompt, showMessage]);
 
+  // 🔥 Исправлено: добавлен флаг autoStart: false для предотвращения автоматического запуска
   const { startTour } = useAppTour({
     isReady: !isLoading && !!fullSchedule,
-    setIsMenuOpen
+    setIsMenuOpen,
+    autoStart: false 
   });
 
   const dateKey = format(selectedDate, 'yyyy-MM-dd');

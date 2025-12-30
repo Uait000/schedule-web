@@ -37,6 +37,7 @@ export const PracticeDetailsModal: React.FC<PracticeDetailsModalProps> = ({
     if (c === '8') return { color: '#eab308', bg: 'rgba(234, 179, 8, 0.15)' };
     if (c === 'X' || c === 'Х') return { color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' };
     if (c === '=') return { color: '#0ea5e9', bg: 'rgba(14, 165, 233, 0.15)' };
+    if (c === 'ОВС') return { color: '#ff6600', bg: 'rgba(255, 102, 0, 0.15)' }; // 🔥 Добавлено ОВС
     if (c === 'III') return { color: '#a855f7', bg: 'rgba(168, 85, 247, 0.15)' };
     if (c === 'D' || c === 'Д') return { color: '#e6b8af', bg: 'rgba(230, 184, 175, 0.15)' };
     return { color: '#f97316', bg: 'rgba(249, 115, 22, 0.15)' };
@@ -51,7 +52,7 @@ export const PracticeDetailsModal: React.FC<PracticeDetailsModalProps> = ({
         const eventStart = parseISO(event.dateStart);
         if (type === 'attestation') return (event.type === 'attestation' || event.code === '::') && isAfter(eventStart, now);
         if (type === 'holiday') return event.type === 'holiday' && isAfter(eventStart, now);
-        if (type === 'practice') return (event.type === 'practice' || ['0','8','X','Х'].includes(event.code)) && isAfter(eventStart, now);
+        if (type === 'practice') return (event.type === 'practice' || ['0','8','X','Х','ОВС'].includes(event.code)) && isAfter(eventStart, now);
         return false;
       })
       .sort((a, b) => parseISO(a.dateStart).getTime() - parseISO(b.dateStart).getTime())[0];
