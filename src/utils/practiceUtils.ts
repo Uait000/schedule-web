@@ -1,6 +1,6 @@
 // src/utils/practiceUtils.ts
 import { Schedule, Lesson } from '../types';
-import { addDays, isBefore, isSameDay, differenceInCalendarDays, parseISO, isAfter, isWithinInterval } from 'date-fns';
+import { addDays, isBefore, isSameDay, differenceInCalendarDays, parseISO, isAfter, isWithinInterval, startOfDay } from 'date-fns';
 
 export interface CalendarEvent {
   title: string;
@@ -8,7 +8,7 @@ export interface CalendarEvent {
   type: 'holiday' | 'attestation' | 'gia' | 'practice';
   dateStart: string; // YYYY-MM-DD
   dateEnd: string;   // YYYY-MM-DD
-  weeks_count: number;
+  weeks_count?: number;
 }
 
 export type PracticeType = 'practice' | 'attestation' | 'holiday' | 'gia' | 'session';
@@ -25,11 +25,10 @@ export interface PracticeInfo {
 }
 
 const KEYWORDS = {
-  attestation: ['промежуточная аттестация', '::', ':'],
-  practice: ['производственная практика', 'учебная практика', 'преддипломная практика', '0', '8', 'x', 'х'],
+  attestation: ['промежуточная аттестация', '::', ':', 'экзамен'],
+  practice: ['производственная практика', 'учебная практика', 'преддипломная практика', '0', '8', 'x', 'х', 'овс'],
   holiday: ['каникулы', '='],
   gia: ['государственная итоговая аттестация', 'гиа', 'iii', 'подготовка к гиа', 'd', 'д'],
-  session: ['сессия', 'экзамены']
 };
 
 function getLessonName(lesson: Lesson): string {
@@ -40,27 +39,20 @@ function getLessonName(lesson: Lesson): string {
 
 export function findUpcomingEvent(
   events: CalendarEvent[], 
-  currentDate: Date, // Дата, выбранная пользователем в календаре
+  currentDate: Date, 
   lookaheadDays: number = 7 
 ): PracticeInfo | null {
   if (!events || events.length === 0) return null;
 
-  const realToday = new Date();
-  realToday.setHours(0, 0, 0, 0);
-  
-  const selectedViewDate = new Date(currentDate);
-  selectedViewDate.setHours(0, 0, 0, 0);
+  const realToday = startOfDay(new Date());
+  const selectedViewDate = startOfDay(currentDate);
 
-  // 1. Ищем ивент, который активен ИМЕННО на выбранную в календаре дату
-  // Либо ивент, который начнется в течение 7 дней от ВЫБРАННОЙ даты
+  // Ищем событие, которое охватывает выбранную дату или начнется скоро
   const targetEvent = events.find(event => {
-    const start = parseISO(event.dateStart);
-    const end = parseISO(event.dateEnd);
+    const start = startOfDay(parseISO(event.dateStart));
+    const end = startOfDay(parseISO(event.dateEnd));
     
-    // Проверяем: выбранная дата внутри интервала события?
     const isVisibleOnThisDate = isWithinInterval(selectedViewDate, { start, end });
-    
-    // Или выбранная дата — это "предпросмотр" за неделю до начала?
     const diffToViewDate = differenceInCalendarDays(start, selectedViewDate);
     const isUpcomingForView = diffToViewDate > 0 && diffToViewDate <= lookaheadDays;
 
@@ -68,17 +60,9 @@ export function findUpcomingEvent(
   });
 
   if (targetEvent) {
-    const start = parseISO(targetEvent.dateStart);
-    const end = parseISO(targetEvent.dateEnd);
+    const start = startOfDay(parseISO(targetEvent.dateStart));
+    const end = startOfDay(parseISO(targetEvent.dateEnd));
     
-    // 🔥 СТАТУС ВСЕГДА СЧИТАЕМ ОТ РЕАЛЬНОГО СЕГОДНЯ (27.12.2025)
-    const isActiveRelativeToday = isWithinInterval(realToday, { start, end });
-    const daysUntilRelativeToday = differenceInCalendarDays(start, realToday);
-
-    // Если мы уже перешли на дату ПОСЛЕ окончания этого ивента (напр. 12.01), 
-    // то этот ивент нам больше не подходит.
-    if (isAfter(selectedViewDate, end)) return null;
-
     return {
       name: targetEvent.title,
       type: targetEvent.type as PracticeType,
@@ -86,8 +70,8 @@ export function findUpcomingEvent(
       dateStart: start,
       dateEnd: end,
       returnDate: addDays(end, 1), 
-      daysUntil: daysUntilRelativeToday,
-      isActive: isActiveRelativeToday
+      daysUntil: differenceInCalendarDays(start, realToday),
+      isActive: isWithinInterval(realToday, { start, end })
     };
   }
 
@@ -100,8 +84,7 @@ export function findNextPractice(
   currentDate: Date
 ): PracticeInfo | null {
   if (!schedule || !schedule.weeks) return null;
-  const realToday = new Date();
-  realToday.setHours(0, 0, 0, 0);
+  const realToday = startOfDay(new Date());
 
   for (let w = 0; w < 2; w++) {
     const targetWeekIndex = (currentWeekIndex + w) % 2;
@@ -125,12 +108,13 @@ export function findNextPractice(
           else if (lessonName.includes('учебная практика') || lessonName.includes(' 0')) { foundType = 'practice'; code = '0'; }
           else if (lessonName.includes('производственная') || lessonName.includes(' 8')) { foundType = 'practice'; code = '8'; }
           else if (lessonName.includes('преддипломная') || lessonName.includes(' x')) { foundType = 'practice'; code = 'X'; }
+          else if (lessonName.includes('овс')) { foundType = 'practice'; code = 'ОВС'; }
           else if (KEYWORDS.holiday.some(k => lessonName.includes(k))) { foundType = 'holiday'; code = '='; }
           else if (KEYWORDS.gia.some(k => lessonName.includes(k))) { foundType = 'gia'; code = 'III'; }
 
           if (foundType) {
             const diffDays = differenceInCalendarDays(checkDate, realToday);
-            if (diffDays <= 7) {
+            if (diffDays <= 14) { // Увеличили окно поиска в расписании
                return {
                  name: getLessonName(lesson),
                  type: foundType,

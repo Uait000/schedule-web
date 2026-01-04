@@ -18,9 +18,6 @@ export function ProfileSwitcher({
   isLoading = false 
 }: ProfileSwitcherProps) {
   const [isRotating, setIsRotating] = useState(false);
-
-  console.log('🔍 ProfileSwitcher: текущие профили', profiles);
-  console.log('🎯 ProfileSwitcher: текущий тип профиля', currentProfileType);
   
   const hasStudent = !!profiles.student;
   const hasTeacher = !!profiles.teacher;
@@ -34,8 +31,6 @@ export function ProfileSwitcher({
     ? profiles.student 
     : profiles.teacher;
 
-  console.log('🎯 ProfileSwitcher: текущий профиль', currentProfile);
-  console.log('🔄 ProfileSwitcher: может переключаться?', hasStudent && hasTeacher);
 
   // СЦЕНАРИЙ 1: ЕСТЬ ОБА ПРОФИЛЯ (Показываем кнопку переключения)
   if (hasStudent && hasTeacher) {
@@ -52,7 +47,6 @@ export function ProfileSwitcher({
         ? profiles.teacher 
         : profiles.student;
 
-      console.log('🔄 ProfileSwitcher: переключаем на', newType, newProfile);
       
       // Вызываем колбэк переключения
       if (newProfile) {

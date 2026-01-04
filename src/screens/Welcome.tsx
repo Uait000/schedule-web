@@ -1,7 +1,9 @@
+// src/screens/Welcome.tsx
+
 import { useState, useEffect } from 'react';
 import '../App.css';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { fetchData } from '../api';
+import { fetchData } from '../api'; // Теперь fetchData экспортируется из api.ts
 import { ProfileType } from '../types/profiles';
 import { dataStore } from '../utils/DataStore';
 
@@ -46,19 +48,21 @@ export function WelcomeScreen() {
     setIsLoading(true);
     setError(null);
 
+    // Используем обновленную функцию fetchData
     fetchData(`/items`)
-      .catch((error) => {
-        console.error("Ошибка получения элементов:", error);
-        setError('Ошибка загрузки данных');
-      })
       .then((result) => {
         setIsLoading(false);
         if (result) {
           setItems({
-            groups: result.groups.sort(),
-            teachers: result.teachers.sort()
+            groups: result.groups ? result.groups.sort() : [],
+            teachers: result.teachers ? result.teachers.sort() : []
           });
         }
+      })
+      .catch((error) => {
+        console.error("Ошибка получения элементов:", error);
+        setIsLoading(false);
+        setError('Ошибка загрузки данных. Проверьте интернет.');
       });
   }, []);
 
@@ -81,56 +85,53 @@ export function WelcomeScreen() {
 
     try {
       setIsLoading(true);
-      const scheduleData = await fetchData(`/${id}/schedule`);
+      // Оптимизация: загружаем расписание заранее, чтобы экран Schedule открылся с данными
+      const scheduleData = await fetchData(`/${encodeURIComponent(id)}/schedule`);
       
-      // Сохраняем в DataStore
+      // Сохраняем в DataStore с глубоким обновлением стейта для мгновенной реакции UI
       await dataStore.updateData(state => {
-        // Если мы добавляем профиль (через плюсик) - мы СОХРАНЯЕМ старые
+        const profileKey = type.toLowerCase() as 'student' | 'teacher';
+        
+        const newProfile = {
+            type: type,
+            id: id,
+            name: id,
+            schedule: scheduleData,
+            overrides: null
+        };
+
+        // Сценарий 1: Добавление дополнительного профиля (через Плюс)
         if (isAddingProfile) {
              return {
                 ...state,
                 profiles: {
                   ...state.profiles,
-                  [type]: {
-                    type: type,
-                    id: id,
-                    name: id,
-                    schedule: scheduleData,
-                    overrides: null
-                  },
+                  [profileKey]: newProfile,
                   lastUsed: type
                 }
              };
         } 
         
-        // 🔥 ИСПРАВЛЕНИЕ: Если мы МЕНЯЕМ группу (сброс) - мы УДАЛЯЕМ старых
-        // Оставляем только новый выбранный профиль
+        // Сценарий 2: Полный сброс или первая настройка
+        // Удаляем метаданные старых групп, чтобы избежать конфликтов хешей (Проблема №1)
         return {
           ...state,
+          profileMetadata: {}, 
           profiles: {
-            student: type === ProfileType.STUDENT ? {
-                type: ProfileType.STUDENT,
-                id: id,
-                name: id,
-                schedule: scheduleData,
-                overrides: null
-            } : undefined, // Удаляем студента, если выбрали препода
-            teacher: type === ProfileType.TEACHER ? {
-                type: ProfileType.TEACHER,
-                id: id,
-                name: id,
-                schedule: scheduleData,
-                overrides: null
-            } : undefined, // Удаляем препода, если выбрали студента
+            student: type === ProfileType.STUDENT ? newProfile : undefined,
+            teacher: type === ProfileType.TEACHER ? newProfile : undefined,
             lastUsed: type
           },
           firstTimeLaunch: state.firstTimeLaunch || Date.now()
         };
       });
 
-      // Сохраняем выбранный ID
+      // Сохраняем выбранный ID в локальное хранилище для синхронизации хуков
       localStorage.setItem('selectedId', id);
       localStorage.setItem('userType', type);
+      
+      // Генерируем событие для мгновенного обновления других компонентов
+      window.dispatchEvent(new Event('profileChanged'));
       
       navigate('/schedule');
     } catch (error) {
@@ -196,7 +197,7 @@ export function WelcomeScreen() {
             ))}
           </div>
           <div className="card listCard">
-            {isLoading && <p>Загрузка...</p>}
+            {isLoading && !items.groups.length && <p>Загрузка...</p>}
             {error && <p style={{ color: 'red' }}>{error}</p>}
             {!isLoading && !error && (
               <div className="groupGrid">
@@ -213,7 +214,7 @@ export function WelcomeScreen() {
             )}
             {!isLoading && !error && filteredGroups.length === 0 && (
                 <p style={{ color: 'var(--color-secondary-text)' }}>
-                    Нет доступных групп. Попробуйте другой курс или проверьте подключение.
+                    Нет доступных групп. Попробуйте другой курс.
                 </p>
             )}
           </div>
@@ -230,7 +231,7 @@ export function WelcomeScreen() {
             onChange={(e) => setTeacherQuery(e.target.value)}
           />
           <div className="teacherList">
-            {isLoading && <p>Загрузка...</p>}
+            {isLoading && !items.teachers.length && <p>Загрузка...</p>}
             {error && <p style={{ color: 'red' }}>{error}</p>}
             {!isLoading && !error && filteredTeachers.map(teacher => (
               <button
@@ -249,11 +250,6 @@ export function WelcomeScreen() {
             {!isLoading && !error && filteredTeachers.length === 0 && teacherQuery.length > 0 && (
                 <p style={{ color: 'var(--color-secondary-text)' }}>
                     Преподаватель не найден.
-                </p>
-            )}
-            {!isLoading && !error && filteredTeachers.length === 0 && teacherQuery.length === 0 && (
-                <p style={{ color: 'var(--color-secondary-text)' }}>
-                    Нет доступных преподавателей.
                 </p>
             )}
           </div>
@@ -275,7 +271,6 @@ export function WelcomeScreen() {
             ) : (
               <>
                 <Icon name="arrow_forward" style={{ marginRight: '8px' }} />
-                {/* 🔥 ИСПРАВЛЕНИЕ: Теперь "Добавить" только если isAddingProfile=true */}
                 {isAddingProfile ? 'Добавить профиль' : 'Продолжить'}
               </>
             )}
@@ -283,9 +278,8 @@ export function WelcomeScreen() {
         </div>
       )}
 
-      <div className="debug-info" style={{ marginTop: '20px', fontSize: '12px', color: '#666' }}>
-        <p><strong>Режим:</strong> {(import.meta as any).env?.MODE || 'production'}</p>
-        <p><strong>Статус:</strong> {isLoading ? 'Загрузка...' : error ? 'Ошибка' : 'Готово'}</p>
+      <div className="debug-info" style={{ marginTop: '20px', fontSize: '12px', color: '#666', textAlign: 'center' }}>
+        <p><strong>Версия приложения:</strong> 2.0.1 (Turbo)</p>
       </div>
     </div>
   );

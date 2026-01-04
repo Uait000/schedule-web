@@ -10,22 +10,111 @@ const Icon = ({ name, style = {} }: { name: string; style?: React.CSSProperties 
   <span className="material-icons" style={{ fontFamily: 'Material Icons', ...style }}>{name}</span>
 );
 
+// 🔥 Дублируем функцию normalizeLesson здесь, если она не экспортируется
+function normalizeLesson(lesson: any): Lesson {
+  if (lesson == null || lesson === 'null' || (typeof lesson === 'object' && Object.keys(lesson).length === 0)) {
+    return { noLesson: {} };
+  }
+
+  const findGroupAnywhere = (obj: any): string | undefined => {
+    if (!obj) return undefined;
+    if (typeof obj === 'string') return obj; 
+    if (typeof obj !== 'object') return undefined;
+    const candidates = ['group', 'Group', 'studentGroup', 'StudentGroup', 'className', 'targetGroup', 'target'];
+    for (const key of candidates) {
+        const val = obj[key];
+        if (val) {
+            if (typeof val === 'string' && val.trim().length > 0) return val;
+            if (typeof val === 'object' && val.name) return val.name;
+            if (typeof val === 'object' && val.group) return val.group;
+        }
+    }
+    if (obj.CommonLesson) return findGroupAnywhere(obj.CommonLesson);
+    if (obj.commonLesson) return findGroupAnywhere(obj.commonLesson);
+    if (obj.willBe) return findGroupAnywhere(obj.willBe);
+    return undefined;
+  };
+
+  const globalGroup = findGroupAnywhere(lesson);
+
+  const common = lesson.CommonLesson || lesson.commonLesson;
+  if (common) {
+    const localGroup = findGroupAnywhere(common);
+    return {
+      commonLesson: {
+        name: common.name || '',
+        teacher: common.teacher || '',
+        room: common.room || '',
+        group: localGroup || globalGroup 
+      }
+    };
+  }
+
+  const subgrouped = lesson.SubgroupedLesson || lesson.subgroupedLesson;
+  if (subgrouped) {
+    return {
+      subgroupedLesson: {
+        name: subgrouped.name || '',
+        subgroups: (subgrouped.subgroups || []).map((sub: any) => {
+          const subLocalGroup = findGroupAnywhere(sub);
+          return {
+            teacher: sub.teacher || '',
+            room: sub.room || '',
+            subgroup_index: sub.subgroup_index || 0,
+            group: subLocalGroup || globalGroup 
+          };
+        })
+      }
+    };
+  }
+  
+  if (lesson.name || lesson.teacher || lesson.room) {
+    if (lesson.subgroup_index !== undefined) {
+      return {
+        subgroupedLesson: {
+          name: lesson.name || '',
+          subgroups: [{
+            teacher: lesson.teacher || '',
+            room: lesson.room || '',
+            subgroup_index: lesson.subgroup_index || 1,
+            group: lesson.group || ''
+          }]
+        }
+      };
+    }
+    return {
+      commonLesson: {
+        name: lesson.name || '',
+        teacher: lesson.teacher || '',
+        room: lesson.room || '',
+        group: lesson.group || globalGroup
+      }
+    };
+  }
+  
+  return { noLesson: {} };
+}
+
 /**
  * Хелпер для сравнения двух уроков (Lesson)
  * Нужен для "слияния" замен
  */
 function isSameLesson(l1: Lesson, l2: Lesson): boolean {
   // Оба 'null' или 'noLesson'
-  if ((l1?.noLesson || l1 === null) && (l2?.noLesson || l2 === null)) return true;
+  if (!l1 || !l2) return false;
+  if ((l1.noLesson || (typeof l1 === 'object' && Object.keys(l1).length === 0)) && 
+      (l2.noLesson || (typeof l2 === 'object' && Object.keys(l2).length === 0))) {
+    return true;
+  }
   
-  const cl1 = l1?.commonLesson;
-  const cl2 = l2?.commonLesson;
+  const cl1 = l1.commonLesson;
+  const cl2 = l2.commonLesson;
   if (cl1 && cl2) {
     return cl1.name === cl2.name && cl1.teacher === cl2.teacher && cl1.group === cl2.group;
   }
 
-  const sl1 = l1?.subgroupedLesson;
-  const sl2 = l2?.subgroupedLesson;
+  const sl1 = l1.subgroupedLesson;
+  const sl2 = l2.subgroupedLesson;
   if (sl1 && sl2) {
      return sl1.name === sl2.name;
   }
@@ -34,33 +123,33 @@ function isSameLesson(l1: Lesson, l2: Lesson): boolean {
   return false;
 }
 
-
 /**
  * Отображает одну пару, решая, показать группу (для преподавателя) 
  * или преподавателя (для студента).
  */
 const LessonDisplay: React.FC<{ lesson: Lesson; isTeacherView: boolean }> = ({ lesson, isTeacherView }) => {
-  if (lesson?.noLesson || lesson === null) {
+  // 🔥 ИСПРАВЛЕНО: правильно обрабатываем null и noLesson
+  if (!lesson || lesson.noLesson || (typeof lesson === 'object' && Object.keys(lesson).length === 0)) {
     return <span className="history-lesson no-lesson">Пары нет</span>;
   }
 
-  if (lesson?.commonLesson) {
-    const { name, teacher, room } = lesson.commonLesson;
+  if (lesson.commonLesson) {
+    const { name, teacher, room, group } = lesson.commonLesson;
     
     // Ищем группу и внутри (commonLesson.group) и снаружи (lesson.group)
-    const group = lesson.commonLesson.group || (lesson as any).group;
-    const detail = isTeacherView ? group : teacher;
+    const displayGroup = group || (lesson as any).group;
+    const detail = isTeacherView ? displayGroup : teacher;
     
     return (
       <span className="history-lesson">
-        {name}
-        {detail && ` (${detail})`}
-        {room && ` [${room}]`}
+        {name || 'Без названия'}
+        {detail && detail !== '' && ` (${detail})`}
+        {room && room !== '' && ` [${room}]`}
       </span>
     );
   }
 
-  if (lesson?.subgroupedLesson) {
+  if (lesson.subgroupedLesson) {
      const { name, subgroups } = lesson.subgroupedLesson;
      const firstSub = subgroups?.[0];
 
@@ -69,8 +158,9 @@ const LessonDisplay: React.FC<{ lesson: Lesson; isTeacherView: boolean }> = ({ l
 
      return (
       <span className="history-lesson">
-        {name} (по подгруппам)
-        {detail && ` (${detail})`}
+        {name || 'Без названия'} (по подгруппам)
+        {detail && detail !== '' && ` (${detail})`}
+        {firstSub?.room && firstSub.room !== '' && ` [${firstSub.room}]`}
       </span>
     );
   }
@@ -82,6 +172,13 @@ const LessonDisplay: React.FC<{ lesson: Lesson; isTeacherView: boolean }> = ({ l
  * Отображает одну замену в 2-колоночном виде ("Было" / "Стало")
  */
 const OverrideDisplay: React.FC<{ override: Override; isTeacherView: boolean }> = ({ override, isTeacherView }) => {
+  // 🔥 ИСПРАВЛЕНО: проверяем, что override существует
+  if (!override) return null;
+  
+  // 🔥 ИСПРАВЛЕНО: нормализуем уроки перед отображением
+  const normalizedShouldBe = override.shouldBe ? normalizeLesson(override.shouldBe) : { noLesson: {} };
+  const normalizedWillBe = override.willBe ? normalizeLesson(override.willBe) : { noLesson: {} };
+  
   return (
     <div className="history-override-item">
       <div className="history-lesson-index">
@@ -90,11 +187,11 @@ const OverrideDisplay: React.FC<{ override: Override; isTeacherView: boolean }> 
       <div className="history-columns">
         <div className="history-column history-column-was">
           <div className="history-column-header">Было</div>
-          <LessonDisplay lesson={override.shouldBe} isTeacherView={isTeacherView} />
+          <LessonDisplay lesson={normalizedShouldBe} isTeacherView={isTeacherView} />
         </div>
         <div className="history-column history-column-became">
           <div className="history-column-header">Стало</div>
-          <LessonDisplay lesson={override.willBe} isTeacherView={isTeacherView} />
+          <LessonDisplay lesson={normalizedWillBe} isTeacherView={isTeacherView} />
         </div>
       </div>
     </div>
@@ -104,10 +201,16 @@ const OverrideDisplay: React.FC<{ override: Override; isTeacherView: boolean }> 
 // Хелпер для форматирования даты
 const formatDate = (entry: HistoryEntry) => {
   try {
-    const date = new Date(entry.year!, entry.month!, entry.day!);
+    if (!entry.year || !entry.month || !entry.day) {
+      return 'Дата не указана';
+    }
+    const date = new Date(entry.year, entry.month, entry.day);
+    if (isNaN(date.getTime())) {
+      return 'Неверная дата';
+    }
     return format(date, 'd MMMM yyyy, cccc', { locale: ru });
   } catch (e) {
-    return 'Неверная дата';
+    return 'Ошибка формата даты';
   }
 };
 
@@ -123,9 +226,14 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, his
   // ❗️❗️ НОВАЯ ЛОГИКА "СЛИЯНИЯ" ЗАМЕН ❗️❗️
   const processedHistory = useMemo(() => {
     return history.map(entry => {
+      if (!entry.overrides || !Array.isArray(entry.overrides) || entry.overrides.length === 0) {
+        return { ...entry, overrides: [] };
+      }
+
       // 1. Разделяем все замены по индексу пары
       const overridesByIndex = new Map<number, Override[]>();
       for (const override of entry.overrides) {
+        if (override.index === undefined || override.index === null) continue;
         if (!overridesByIndex.has(override.index)) {
           overridesByIndex.set(override.index, []);
         }
@@ -214,13 +322,17 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, his
                     {formatDate(entry)}
                   </div>
                   <div className="history-override-list">
-                    {entry.overrides.map((override) => (
-                      <OverrideDisplay 
-                        key={override.index} 
-                        override={override} 
-                        isTeacherView={isTeacherView} 
-                      />
-                    ))}
+                    {entry.overrides && entry.overrides.length > 0 ? (
+                      entry.overrides.map((override) => (
+                        <OverrideDisplay 
+                          key={`${override.index}-${override.shouldBe?.commonLesson?.name || 'none'}`} 
+                          override={override} 
+                          isTeacherView={isTeacherView} 
+                        />
+                      ))
+                    ) : (
+                      <div className="history-no-overrides">В этот день замен не было</div>
+                    )}
                   </div>
                 </div>
               ))}

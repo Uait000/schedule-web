@@ -84,16 +84,20 @@ export class DataStore {
 
   subscribe(listener: (state: AppState) => void): () => void {
     this.listeners.push(listener);
-    // 🔥 ИСПРАВЛЕНО: Убрали немедленный вызов listener(this.state), 
-    // чтобы не провоцировать лишний цикл обновлений при подписке
     return () => {
       this.listeners = this.listeners.filter(l => l !== listener);
     };
   }
 
   private notifyListeners(): void {
-    // Делаем копию состояния, чтобы React понимал, что объект изменился
-    const currentState = { ...this.state };
+    // 🔥 ВАЖНО: Создаем копию объекта состояния и вложенных массивов, 
+    // чтобы React увидел изменение ссылок и вызвал ререндер.
+    const currentState = { 
+        ...this.state,
+        profiles: { ...this.state.profiles },
+        customCourses: [...this.state.customCourses],
+        profileMetadata: { ...this.state.profileMetadata }
+    };
     this.listeners.forEach(listener => listener(currentState));
   }
 
@@ -123,25 +127,19 @@ export class DataStore {
     }));
   }
 
-  async setProfile(type: ProfileType, profileData: Profile): Promise<void> {
-    const key = type.toLowerCase() as 'student' | 'teacher';
+  async addCustomCourse(course: CustomCourse): Promise<void> {
     await this.updateData(state => ({
       ...state,
-      profiles: {
-        ...state.profiles,
-        [key]: profileData
-      }
+      customCourses: [...state.customCourses, course] // Создаем новый массив
     }));
+    // Вызываем событие для синхронизации, если открыто несколько вкладок
+    window.dispatchEvent(new Event('storage'));
   }
 
-  async setLastUsed(type: ProfileType): Promise<void> {
+  async removeCustomCourse(courseId: string): Promise<void> {
     await this.updateData(state => ({
       ...state,
-      lastUsed: type,
-      profiles: {
-        ...state.profiles,
-        lastUsed: type
-      }
+      customCourses: state.customCourses.filter(c => c.id !== courseId)
     }));
   }
 
@@ -150,17 +148,11 @@ export class DataStore {
     return this.state.profiles[key];
   }
 
-  async addCustomCourse(course: CustomCourse): Promise<void> {
+  async setLastUsed(type: ProfileType): Promise<void> {
     await this.updateData(state => ({
       ...state,
-      customCourses: [...state.customCourses, course]
-    }));
-  }
-
-  async removeCustomCourse(courseId: string): Promise<void> {
-    await this.updateData(state => ({
-      ...state,
-      customCourses: state.customCourses.filter(c => c.id !== courseId)
+      lastUsed: type,
+      profiles: { ...state.profiles, lastUsed: type }
     }));
   }
 

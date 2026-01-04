@@ -1,3 +1,5 @@
+// src/screens/Schedule.tsx
+
 import { useNavigate } from 'react-router-dom';
 import ScheduleItem, { isLessonCurrent } from '../components/ScheduleItem';
 import { NoteModal } from '../components/NoteModal';
@@ -19,7 +21,7 @@ import { useAppTour } from '../hooks/useAppTour';
 import { PracticeBanner } from '../components/PracticeBanner';
 import { PracticeDetailsModal } from '../components/PracticeDetailsModal';
 import { AllEventsModal } from '../components/AllEventsModal'; 
-import { RateModal } from '../components/RateModal'; // 🔥 Используем импорт (убедись, что путь верный)
+import { RateModal } from '../components/RateModal'; 
 import { findNextPractice, findUpcomingEvent, PracticeInfo } from '../utils/practiceUtils';
 
 interface LessonData {
@@ -29,6 +31,8 @@ interface LessonData {
 }
 
 const DAYS_OF_WEEK = [ 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница' ];
+
+// --- Helper Functions ---
 
 function groupSubgroups(lessons: any[], isTeacherView: boolean): any[] {
   if (!lessons || !Array.isArray(lessons)) return lessons;
@@ -199,6 +203,8 @@ const Icon = ({ name, style = {} }: { name: string; style?: React.CSSProperties 
   <span className="material-icons" style={{ fontSize: 'inherit', verticalAlign: 'middle', ...style }}>{name}</span>
 );
 
+// --- Sub-components (Calendar, Menu, Snackbar) ---
+
 function CustomCalendar({ isOpen, onClose, onSelectDate, currentDate, calendarEvents }: { isOpen: boolean; onClose: () => void; onSelectDate: (date: Date) => void; currentDate: Date; calendarEvents: CalendarEvent[]; }) { 
   const [viewDate, setViewDate] = useState(currentDate); 
   const [dateInput, setDateInput] = useState(format(currentDate, 'dd.MM.yyyy')); 
@@ -258,8 +264,6 @@ function CustomCalendar({ isOpen, onClose, onSelectDate, currentDate, calendarEv
         if (!isNaN(newDate.getTime()) && newDate.getDate() === day && newDate.getMonth() === month && newDate.getFullYear() === year) { 
           setIsValid(true); 
           setViewDate(newDate); 
-          onSelectDate(newDate); 
-          onClose(); 
         } else { setIsValid(false); } 
       } else { setIsValid(false); } 
     } else { setIsValid(true); } 
@@ -379,7 +383,8 @@ function DropdownMenu({
     else if (action === 'changeGroup') { 
       localStorage.removeItem('selectedId'); 
       localStorage.removeItem('userType'); 
-      navigate('/', { replace: true }); 
+      // 🔥 Переход с жесткой перезагрузкой для корректного сброса состояния
+      window.location.href = '/'; 
     } else if (action === 'feedback') { window.open('https://t.me/ttgt1bot', '_blank'); } 
     else if (action === 'help') { onStartTour(); } 
   }; 
@@ -458,11 +463,34 @@ function Snackbar({ message, isVisible, onClose, link, linkText }: { message: st
   
   if (!isVisible) return null; 
   
-  const handleLinkClick = (e: React.MouseEvent) => { e.stopPropagation(); if (link) { window.open(link, '_blank'); } onClose(); };
+  const handleLinkClick = (e: React.MouseEvent) => { 
+    e.stopPropagation(); 
+    if (link) { window.open(link, '_blank'); } 
+    onClose(); 
+  };
   const handleContainerClick = () => { onClose(); };
   
   return ( 
-    <div style={{ position: 'fixed', bottom: '100px', left: '50%', transform: 'translateX(-50%)', backgroundColor: 'var(--color-surface)', color: 'var(--color-text)', padding: '0', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)', zIndex: 2000, maxWidth: '320px', width: '90%', animation: 'fadeIn 0.3s ease', border: '1px solid var(--color-border)', overflow: 'hidden' }} onClick={handleContainerClick}> 
+    <div 
+      style={{ 
+        position: 'fixed', 
+        bottom: '100px', 
+        left: '50%', 
+        transform: 'translateX(-50%)', 
+        backgroundColor: 'var(--color-surface)', 
+        color: 'var(--color-text)', 
+        padding: '0', 
+        borderRadius: '16px', 
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)', 
+        zIndex: 2000, 
+        maxWidth: '320px', 
+        width: '90%', 
+        animation: 'fadeIn 0.3s ease', 
+        border: '1px solid var(--color-border)', 
+        overflow: 'hidden' 
+      }} 
+      onClick={handleContainerClick}
+    > 
       <div style={{ padding: '16px 20px', borderBottom: link ? '1px solid var(--color-border)' : 'none' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '4px' }}>
           <Icon name="info" style={{ fontSize: '20px', color: 'var(--color-primary)', marginRight: '8px' }} />
@@ -470,7 +498,31 @@ function Snackbar({ message, isVisible, onClose, link, linkText }: { message: st
         </div>
         <div style={{ textAlign: 'center', fontSize: '14px', lineHeight: '1.4' }}>{message}</div>
       </div>
-      {link && (<div style={{ padding: '12px 20px' }}><button handleLinkClick={handleLinkClick} style={{ backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', borderRadius: '10px', padding: '10px 16px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', width: '100%', transition: 'all 0.2s ease', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="open_in_new" style={{ fontSize: '18px', marginRight: '8px' }} />{linkText || 'Посмотреть на сайте'}</button></div>)}
+      {link && (
+        <div style={{ padding: '12px 20px' }}>
+          <button 
+            onClick={handleLinkClick} 
+            style={{ 
+              backgroundColor: 'var(--color-primary)', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '10px', 
+              padding: '10px 16px', 
+              fontSize: '14px', 
+              fontWeight: '600', 
+              cursor: 'pointer', 
+              width: '100%', 
+              transition: 'all 0.2s ease', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center' 
+            }}
+          >
+            <Icon name="open_in_new" style={{ fontSize: '18px', marginRight: '8px' }} />
+            {linkText || 'Посмотреть на сайте'}
+          </button>
+        </div>
+      )}
     </div> 
   ); 
 }
@@ -518,6 +570,9 @@ export function ScheduleScreen() {
   const [isAnimating, setIsAnimating] = useState(false);
   const [swipeLimitReached, setSwipeLimitReached] = useState(false);
 
+  // 🔥 FETCH GUARD
+  const lastFetchRef = useRef<string>("");
+
   const showMessage = useCallback((message: string) => { 
     setSnackbarMessage(message); 
     setSnackbarLink(null); 
@@ -536,104 +591,150 @@ export function ScheduleScreen() {
 
   const loadProfileData = useCallback(async (profileId: string, profileType: ProfileType, date: Date = new Date()) => {
     if (!profileId) return;
-    setIsLoading(true);
-    setError(null);
+    
     const formattedDate = format(date, 'yyyy-MM-dd');
-    try {
-        const metadata = dataStore.getProfileMetadata(profileId);
-        const [schedRes, ovrRes, evsRes] = await Promise.all([
-          scheduleApi.getSchedule(profileId).catch(() => null),
-          scheduleApi.refreshOverrides(profileId, formattedDate).catch(() => null),
-          scheduleApi.getEvents(profileId).catch(() => null)
-        ]);
+    const metadata = dataStore.getProfileMetadata(profileId);
+    
+    const currentFetchKey = `${profileId}_${formattedDate}_${metadata.scheduleUpdate}_${metadata.eventsHash}`;
+    
+    if (lastFetchRef.current === currentFetchKey) return;
+    lastFetchRef.current = currentFetchKey;
 
-        let finalEvents = evsRes?.events || evsRes || [];
-        if (profileType === ProfileType.TEACHER) {
-            const linkedStudentId = appState.profiles.student?.id;
-            if (linkedStudentId) {
-                const groupEvents = await scheduleApi.getEvents(linkedStudentId).catch(() => null);
-                if (groupEvents) finalEvents = groupEvents.events || groupEvents;
-            }
+    const cachedProfile = dataStore.getState().profiles[profileType === ProfileType.TEACHER ? 'teacher' : 'student'];
+    
+    if (cachedProfile?.schedule) {
+        setFullSchedule(cachedProfile.schedule);
+        setOverrides(cachedProfile.overrides || null);
+        
+        // 🔥 ИСПРАВЛЕНИЕ: Преподаватель всегда видит события своей привязанной группы
+        const sid = dataStore.getState().profiles.student?.id;
+        if (sid) {
+            const smeta = dataStore.getProfileMetadata(sid);
+            if (smeta.events) setCalendarEvents(smeta.events);
+        } else if (metadata.events) {
+            setCalendarEvents(metadata.events);
         }
+    } else {
+        setIsLoading(true);
+    }
 
-        if (schedRes) {
-            let normalizedSchedule = schedRes;
-             if (schedRes.weeks) {
-                 normalizedSchedule = { ...schedRes, weeks: schedRes.weeks.map((week: any) => ({
-                    ...week,
-                    days: week.days.map((day: any) => ({
-                        ...day,
-                        lessons: day.lessons && Array.isArray(day.lessons) 
-                            ? groupSubgroups(day.lessons, profileType === ProfileType.TEACHER).map(normalizeLesson)
-                            : []
-                    }))
-                 }))};
-             }
+    setError(null);
+    try {
+        const info = await scheduleApi.getInfo(
+          profileId, 
+          formattedDate, 
+          metadata.scheduleUpdate || 0, 
+          metadata.eventsHash || ""
+        );
+
+        if (info.schedule) {
+            const normalizedSchedule = { 
+              ...info.schedule, 
+              weeks: info.schedule.weeks.map((week: any) => ({
+                ...week,
+                days: week.days.map((day: any) => ({
+                    ...day,
+                    lessons: (day.lessons || []).map((lesson: any) => 
+                        groupSubgroups([normalizeLesson(lesson)], profileType === ProfileType.TEACHER)[0] || normalizeLesson(lesson)
+                    )
+                }))
+              }))
+            };
             setFullSchedule(normalizedSchedule);
         }
-        if (finalEvents) {
-            setCalendarEvents(finalEvents);
-            dataStore.updateProfileMetadata(profileId, { events: finalEvents, eventsHash: evsRes?.sha256 || "" });
+
+        let events = info.events?.events || info.events || [];
+        
+        // 🔥 ИСПРАВЛЕНИЕ: Если вы препод или данных нет, подтягиваем из группы
+        const studentId = dataStore.getState().profiles.student?.id;
+        if (studentId && events.length === 0) {
+            const groupEvents = await scheduleApi.getInfo(studentId, formattedDate, 0, "").catch(() => null);
+            if (groupEvents) events = groupEvents.events?.events || groupEvents.events || [];
         }
-        if (ovrRes) {
+
+        if (events && events.length > 0) {
+            setCalendarEvents(events);
+        }
+
+        if (info.overrides) {
             const normalizedOverrides = {
-                ...ovrRes,
-                overrides: (ovrRes.overrides || []).map((override: any) => ({
-                    ...override,
-                    shouldBe: normalizeLesson(override.shouldBe),
-                    willBe: normalizeLesson(override.willBe)
+                ...info.overrides,
+                overrides: (info.overrides.overrides || []).map((o: any) => ({
+                    ...o,
+                    shouldBe: normalizeLesson(o.shouldBe),
+                    willBe: normalizeLesson(o.willBe)
                 }))
             };
             setOverrides(normalizedOverrides);
         }
+
+        await dataStore.updateProfileMetadata(profileId, {
+            scheduleUpdate: info.schedule_update || metadata.scheduleUpdate,
+            eventsHash: info.events?.sha256 || metadata.eventsHash,
+            events: events
+        });
+
         await dataStore.updateData(s => ({
             ...s,
             profiles: {
                 ...s.profiles,
-                [profileType]: {
-                    ...s.profiles[profileType],
+                [profileType === ProfileType.TEACHER ? 'teacher' : 'student']: {
+                    ...s.profiles[profileType === ProfileType.TEACHER ? 'teacher' : 'student'],
                     id: profileId,
-                    schedule: schedRes || fullSchedule,
-                    overrides: ovrRes || overrides
+                    schedule: info.schedule || fullSchedule,
+                    overrides: info.overrides || overrides
                 }
             }
         }));
-    } catch (err) { console.error("Load Error:", err); if (!fullSchedule) setError('Ошибка сервера.'); } 
-    finally { setIsLoading(false); }
-  }, [appState.profiles.student, fullSchedule, overrides]);
+
+    } catch (err) { 
+        console.error("Load Error:", err); 
+        if (!fullSchedule) setError('Ошибка сервера. Попробуйте позже.'); 
+    } finally { 
+        setIsLoading(false); 
+    }
+  }, [fullSchedule, overrides]);
 
   const handleProfileSwitch = useCallback(async (newType: ProfileType, newProfile: any) => {
     if (isSwitchingProfile) return;
     setIsSwitchingProfile(true);
+    
+    if (newProfile.schedule) {
+        setFullSchedule(newProfile.schedule);
+        setOverrides(newProfile.overrides || null);
+        const meta = dataStore.getProfileMetadata(newProfile.id);
+        if (meta.events) setCalendarEvents(meta.events);
+    }
+
     try {
       await dataStore.setLastUsed(newType);
       localStorage.setItem('selectedId', newProfile.id);
       localStorage.setItem('userType', newType);
       window.dispatchEvent(new Event('profileChanged'));
+      lastFetchRef.current = ""; 
       await loadProfileData(newProfile.id, newType, selectedDate);
       showMessage(`Переключено на: ${newProfile.name}`);
-    } catch (error) { console.error('Error switching profile:', error); showMessage('Ошибка при загрузке'); } 
-    finally { setIsSwitchingProfile(false); }
+    } catch (error) { 
+        console.error('Error switching profile:', error); 
+        showMessage('Ошибка при загрузке'); 
+    } finally { 
+        setIsSwitchingProfile(false); 
+    }
   }, [isSwitchingProfile, loadProfileData, selectedDate, showMessage]);
 
   const handleRateSubmit = async (stars: number, comment: string) => {
     try {
-      // Формируем объект строго по схеме Егора
       const payload = {
-        stars: Number(stars), // Гарантируем, что это целое число
-        comment: String(comment || ""), // Если комментария нет, шлем пустую строку
+        stars: Number(stars), 
+        comment: String(comment || ""), 
         teacher: isTeacherView ? (appState.profiles.teacher?.name || "Не указан") : null,
         group: appState.profiles.student?.name || "Не указана",
-        platform: 'web-ttgt-app' // Уникальный ID вашего приложения
+        platform: 'web-ttgt-app' 
       };
-
-      console.log('Отправка оценки:', payload); // Для отладки в консоли
 
       const response = await scheduleApi.postRate(payload);
       
-      // Проверяем, если сервер вернул ошибку, которую мы не поймали в fetch
       if (response && response.detail) {
-        console.error('Ошибка валидации сервера:', response.detail);
         showMessage("Ошибка: данные не приняты сервером");
         return;
       }
@@ -642,7 +743,6 @@ export function ScheduleScreen() {
       setIsRateModalOpen(false);
       showMessage("Спасибо за оценку! ❤️");
     } catch(e) { 
-      console.error("Критическая ошибка отправки:", e);
       showMessage("Ошибка отправки оценки"); 
     }
   };
@@ -691,14 +791,11 @@ export function ScheduleScreen() {
     }
   }, [deferredPrompt, showMessage]);
 
-  // 🔥 Исправлено: добавлен флаг autoStart: false для предотвращения автоматического запуска
   const { startTour } = useAppTour({
     isReady: !isLoading && !!fullSchedule,
     setIsMenuOpen,
     autoStart: false 
   });
-
-  const dateKey = format(selectedDate, 'yyyy-MM-dd');
 
   const scrollToActiveDay = useCallback((dayIndex: number) => {
     if (!tabsRef.current) return;
@@ -718,18 +815,16 @@ export function ScheduleScreen() {
 
   useEffect(() => {
     const unsubscribe = dataStore.subscribe((newState) => {
-      setAppState(prev => {
-          const isSame = prev.lastUsed === newState.lastUsed && 
-                        prev.profiles.student?.id === newState.profiles.student?.id &&
-                        prev.profiles.teacher?.id === newState.profiles.teacher?.id;
-          if (isSame) return prev;
-          return newState;
-      });
+      setAppState(newState); 
+      setDataVersion(v => v + 1); 
     });
     return () => unsubscribe();
   }, []);
 
-  const handleAddProfile = () => { navigate('/', { state: { fromAddProfile: true } }); };
+  // 🔥 ИСПРАВЛЕНИЕ: Добавление профиля теперь корректно перенаправляет, позволяя добавить новый к текущим
+  const handleAddProfile = useCallback(() => { 
+    navigate('/', { state: { fromAddProfile: true } }); 
+  }, [navigate]);
 
   const handleTouchStart = (e: React.TouchEvent) => { setTouchStart(e.targetTouches[0].clientX); setSwipeLimitReached(false); };
   const handleTouchMove = (e: React.TouchEvent) => { setTouchEnd(e.targetTouches[0].clientX); };
@@ -775,11 +870,12 @@ export function ScheduleScreen() {
      setSelectedDate(addDays(selectedDate, activeWeekIndex === 0 ? 7 : -7));
   };
   
-  const handleDateSelect = (date: Date) => { 
+  // 🔥 ИСПРАВЛЕНИЕ ЗАЦИКЛИВАНИЯ: Используем getTime() для стабильной зависимости
+  const handleDateSelect = useCallback((date: Date) => { 
       setSelectedDate(date);
       setActiveWeekIndex(getWeekNumber(date));
       setActiveDayIndex(getDay(date) === 0 || getDay(date) === 6 ? 0 : getDayIndex(date));
-  };
+  }, [setSelectedDate, setActiveWeekIndex, setActiveDayIndex]);
 
   const checkOverrides = () => {
     setSnackbarMessage("Проверьте актуальное расписание замен на официальном сайте ТТЖТ.");
@@ -807,9 +903,6 @@ export function ScheduleScreen() {
   const handleSaveNote = (notes: string, subgroup: number) => {
     if (editingLessonIndex === null) return;
     const targetDate = new Date(selectedDate); 
-    const currentDayOfWeek = getDayIndex(targetDate); 
-    const diff = activeDayIndex - currentDayOfWeek;
-    targetDate.setDate(targetDate.getDate() + diff);
     saveLessonData(currentProfileId, activeWeekIndex, activeDayIndex, editingLessonIndex, { notes, subgroup, lastUpdated: targetDate.getTime() });
     setDataVersion(v => v + 1);
   };
@@ -833,43 +926,33 @@ export function ScheduleScreen() {
       await loadProfileData(selectedId, userType || ProfileType.STUDENT, todayDate);
     };
     initializeData();
-  }, [navigate, resetToToday, loadProfileData, appState.lastUsed]);
+  }, [navigate, resetToToday, loadProfileData]);
 
+  // 🔥 СТАБИЛЬНЫЕ ЗАВИСИМОСТИ (Fix Depth Error)
+  const selectedDateTime = selectedDate.getTime();
   useEffect(() => {
-      if(!currentProfileId || !hasInitialized.current) return;
-      Promise.all([
-        scheduleApi.refreshOverrides(currentProfileId, dateKey).catch(() => null),
-        scheduleApi.getSchedule(currentProfileId).catch(() => null)
-      ]).then(([ovr, sched]) => {
-          if (ovr) {
-              const normalized = {
-                ...ovr,
-                overrides: (ovr.overrides || []).map((o: any) => ({
-                    ...o,
-                    shouldBe: normalizeLesson(o.shouldBe),
-                    willBe: normalizeLesson(o.willBe)
-                }))
-              };
-              setOverrides(normalized);
-          } 
-          if (sched) { setFullSchedule(sched); }
-      }).catch(() => {
-          console.warn('Background update skipped');
-      });
-  }, [dateKey, currentProfileId]);
+    const userType = localStorage.getItem('userType') as ProfileType;
+    if (hasInitialized.current && currentProfileId) {
+        loadProfileData(currentProfileId, userType || ProfileType.STUDENT, new Date(selectedDateTime));
+    }
+  }, [selectedDateTime, currentProfileId, loadProfileData]);
 
   useEffect(() => {
     if (!fullSchedule) { setDisplaySchedule(null); return; }
     const newSchedule = JSON.parse(JSON.stringify(fullSchedule)) as Schedule;
     const currentWeekData = newSchedule.weeks?.[activeWeekIndex % 2];
     if (!currentWeekData) { setDisplaySchedule(newSchedule); return; }
+    
+    const curDate = new Date(selectedDateTime);
     const blockingEvent = calendarEvents.find(event => {
         if (event.type === 'attestation' || event.type === 'holiday') return false; 
         const start = startOfDay(parseISO(event.dateStart));
         const end = endOfDay(parseISO(event.dateEnd));
-        return isWithinInterval(selectedDate, { start, end });
+        return isWithinInterval(curDate, { start, end });
     });
-    if (blockingEvent) {
+
+    // 🔥 ИСПРАВЛЕНИЕ: Преподавателям НЕ блокируем пары заглушкой события
+    if (blockingEvent && !isTeacherView) {
          const day = currentWeekData.days[activeDayIndex];
          if (day && day.lessons) {
              day.lessons = day.lessons.map(() => ({ 
@@ -879,10 +962,14 @@ export function ScheduleScreen() {
          setDisplaySchedule(newSchedule);
          return; 
     }
+
     if (!applyOverrides || !overrides) { setDisplaySchedule(newSchedule); return; }
+    
     const isAttestation = overrides.practiceCode === '::' || overrides.practiceCode === ':';
     const isHoliday = overrides.practiceCode === '=' || overrides.practiceCode === '*';
-    if (overrides.isPractice && overrides.isBlocking && !isAttestation && !isHoliday) {
+
+    // 🔥 ИСПРАВЛЕНИЕ: Преподавателям НЕ блокируем пары практикой
+    if (overrides.isPractice && overrides.isBlocking && !isAttestation && !isHoliday && !isTeacherView) {
         const day = currentWeekData.days[activeDayIndex];
         if (day && day.lessons) {
             const practicePlaceholder = { 
@@ -897,12 +984,12 @@ export function ScheduleScreen() {
       if (day && day.lessons) {
         overrideList.forEach(override => {
           if (day.lessons[override.index] !== undefined) {
-             const originalLesson = day.lessons[override.index];
-             const overrideWillBe = override.willBe;
-             if (isTeacherView) {
+              const originalLesson = day.lessons[override.index];
+              const overrideWillBe = override.willBe;
+              if (isTeacherView) {
                 day.lessons[override.index] = overrideWillBe;
-             } else {
-                 if (originalLesson?.subgroupedLesson && overrideWillBe?.noLesson) {
+              } else {
+                  if (originalLesson?.subgroupedLesson && overrideWillBe?.noLesson) {
                     const shouldBeTeacher = override.shouldBe.commonLesson?.teacher;
                     if (shouldBeTeacher) {
                        const teacherLastName = shouldBeTeacher.split(' ')[0];
@@ -913,16 +1000,16 @@ export function ScheduleScreen() {
                           day.lessons[override.index] = { subgroupedLesson: { name: originalLesson.subgroupedLesson.name, subgroups: remainingSubgroups } };
                        } else { day.lessons[override.index] = { noLesson: {} }; }
                     } else { day.lessons[override.index] = overrideWillBe; }
-                 } else if (originalLesson?.subgroupedLesson && overrideWillBe?.subgroupedLesson) {
+                  } else if (originalLesson?.subgroupedLesson && overrideWillBe?.subgroupedLesson) {
                     day.lessons[override.index] = processSubgroupedOverride(originalLesson, overrideWillBe);
-                 } else { day.lessons[override.index] = overrideWillBe; }
-             }
+                  } else { day.lessons[override.index] = overrideWillBe; }
+              }
           }
         });
       }
     }
     setDisplaySchedule(newSchedule);
-  }, [fullSchedule, overrides, applyOverrides, calendarEvents, selectedDate.getTime(), activeWeekIndex, activeDayIndex, isTeacherView]);
+  }, [fullSchedule, overrides, applyOverrides, calendarEvents, selectedDateTime, activeWeekIndex, activeDayIndex, isTeacherView]);
 
   const lessonsToShow = useMemo(() => {
      const weekData = displaySchedule?.weeks?.[activeWeekIndex % 2];
@@ -943,11 +1030,11 @@ export function ScheduleScreen() {
             let targetIndex = index;
             if (activeDayIndex === 1 && index >= 3) targetIndex = index + 1;
             if (targetIndex >= 0 && targetIndex < lessonCount) {
-              if (lessonsArray[targetIndex].noLesson || Object.keys(lessonsArray[targetIndex]).length === 0) {
+              if (!lessonsArray[targetIndex] || lessonsArray[targetIndex].noLesson || Object.keys(lessonsArray[targetIndex]).length === 0) {
                   lessonsArray[targetIndex] = { commonLesson: { name: course.name, teacher: course.teacher, room: course.room, group: course.teacher } };
                   (lessonsArray[targetIndex] as any).customCourseId = course.id;
               }
-          }
+            }
         }
      });
      return lessonsArray;
@@ -968,33 +1055,35 @@ export function ScheduleScreen() {
 
   const lessonToEdit = (lessonsToShow && editingLessonIndex !== null) ? lessonsToShow[editingLessonIndex] : null;
   const currentLessonData = editingLessonIndex !== null ? getSavedLessonData(currentProfileId, activeWeekIndex, activeDayIndex, editingLessonIndex) : { notes: '', subgroup: 0 };
-  const isWeekCurrent = activeWeekIndex === getWeekNumber(new Date());
 
   const practiceInfo = useMemo<PracticeInfo | null>(() => {
     let info: PracticeInfo | null = null;
-    if (isTeacherView) {
-        const linkedStudentId = appState.profiles.student?.id;
-        if (linkedStudentId) {
-            const activeEvent = calendarEvents.find(ev => {
-                const start = startOfDay(parseISO(ev.dateStart));
-                const end = endOfDay(parseISO(ev.dateEnd));
-                return isWithinInterval(selectedDate, { start, end });
-            });
-            if (activeEvent) {
-                return {
-                    name: `${appState.profiles.student?.name}: ${activeEvent.title}`,
-                    type: activeEvent.type as any,
-                    code: activeEvent.code,
-                    dateStart: parseISO(activeEvent.dateStart),
-                    dateEnd: parseISO(activeEvent.dateEnd),
-                    daysUntil: 0,
-                    isActive: true,
-                    returnDate: addDays(parseISO(activeEvent.dateEnd), 1)
-                };
-            }
-        }
+    const curDate = new Date(selectedDateTime);
+    // 🔥 ИСПРАВЛЕНИЕ: Поиск событий привязанной группы для баннера
+    const scheduleToSearch = (isTeacherView && appState.profiles.student?.schedule) 
+        ? appState.profiles.student.schedule 
+        : displaySchedule;
+
+    const activeEvent = calendarEvents.find(ev => {
+        const start = startOfDay(parseISO(ev.dateStart));
+        const end = endOfDay(parseISO(ev.dateEnd));
+        return isWithinInterval(curDate, { start, end });
+    });
+
+    if (activeEvent) {
+        return {
+            name: (isTeacherView ? `${appState.profiles.student?.name}: ${activeEvent.title}` : activeEvent.title),
+            type: activeEvent.type as any,
+            code: activeEvent.code,
+            dateStart: parseISO(activeEvent.dateStart),
+            dateEnd: parseISO(activeEvent.dateEnd),
+            daysUntil: 0,
+            isActive: true,
+            returnDate: addDays(parseISO(activeEvent.dateEnd), 1)
+        };
     }
-    const upcomingHoliday = findUpcomingEvent(calendarEvents, selectedDate, 4);
+
+    const upcomingHoliday = findUpcomingEvent(calendarEvents, curDate, 4);
     if (upcomingHoliday) {
         info = upcomingHoliday;
     } else if (overrides && (overrides.isPractice || overrides.practiceTitle)) {
@@ -1004,36 +1093,23 @@ export function ScheduleScreen() {
        if (code === '::' || title.toLowerCase().includes('аттестация')) type = 'attestation';
        else if (['III', 'D'].includes(code)) type = 'gia';
        else if (code === '=') type = 'holiday';
-       const dateStart = overrides.dateStart ? parseISO(overrides.dateStart) : selectedDate;
-       const dateEnd = overrides.dateEnd ? parseISO(overrides.dateEnd) : null;
-       const returnDate = overrides.returnDate ? parseISO(overrides.returnDate) : null;
+       const dateStart = overrides.dateStart ? parseISO(overrides.dateStart) : curDate;
        const today = new Date();
        today.setHours(0, 0, 0, 0);
        const daysUntil = differenceInCalendarDays(dateStart, today);
-       info = { name: title, type: type, dateStart: dateStart, dateEnd: dateEnd, returnDate: returnDate, daysUntil: daysUntil, isActive: daysUntil <= 0 };
+       info = { name: title, type: type, dateStart: dateStart, dateEnd: overrides.dateEnd ? parseISO(overrides.dateEnd) : null, returnDate: overrides.returnDate ? parseISO(overrides.returnDate) : null, daysUntil: daysUntil, isActive: daysUntil <= 0 };
     } else {
-       info = findNextPractice(displaySchedule, activeWeekIndex, selectedDate);
-    }
-    if (!info) return null;
-    const nameLower = info.name.toLowerCase();
-    if (isTeacherView) {
-        const isAllowed = nameLower.includes('промежуточная аттестация') || nameLower.includes('каникулы') || nameLower.includes('государственная итоговая аттестация') || nameLower.includes('подготовка к государственной итоговой аттестации');
-        return isAllowed ? info : null;
-    }
-    const isFirstYear = currentProfileId.includes("-1-");
-    if (isFirstYear) {
-        const isAllowed = nameLower.includes('промежуточная аттестация') || nameLower.includes('каникулы');
-        return isAllowed ? info : null;
+       info = findNextPractice(scheduleToSearch, activeWeekIndex, curDate);
     }
     return info;
-  }, [calendarEvents, selectedDate, overrides, displaySchedule, activeWeekIndex, isTeacherView, currentProfileId, appState.profiles.student]);
+  }, [calendarEvents, selectedDateTime, overrides, displaySchedule, activeWeekIndex, isTeacherView, appState.profiles.student]);
 
   const handlePracticeClick = () => { if (practiceInfo) setIsPracticeModalOpen(true); };
 
   const currentWeekDates = useMemo(() => {
-    const monday = startOfWeek(selectedDate, { weekStartsOn: 1 });
+    const monday = startOfWeek(new Date(selectedDateTime), { weekStartsOn: 1 });
     return [0, 1, 2, 3, 4].map((i) => addDays(monday, i));
-  }, [selectedDate]);
+  }, [selectedDateTime]);
 
   return (
     <>
@@ -1041,8 +1117,7 @@ export function ScheduleScreen() {
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Material+Icons&display=block'); 
         :root { font-family: 'Inter', sans-serif !important; }
-        .calendar-day.disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; background: rgba(255,255,255,0.05); }
-        .tab-button-content { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 0; font-family: 'Inter', sans-serif; }
+        .tab-button-content { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 0; }
         .tab-day-name { font-size: 14px; font-weight: 700; color: var(--color-text); opacity: 0.6; }
         .tab-day-date { font-size: 14px; font-weight: 700; color: var(--color-text); white-space: nowrap; opacity: 0.6; }
         .tab-button.active .tab-day-name, .tab-button.active .tab-day-date { color: #8c67f6; opacity: 1; }
@@ -1059,16 +1134,12 @@ export function ScheduleScreen() {
         .calendar-weekday { font-size: 13px; font-weight: 700; color: var(--color-primary); opacity: 0.8; }
         .calendar-days-modern { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 24px; }
         .calendar-day-modern { aspect-ratio: 1; border: none; background: transparent; color: var(--color-text); border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s; position: relative; }
-        .calendar-day-modern:hover:not(.disabled) { background: var(--color-surface-container); }
         .calendar-day-modern.today { color: var(--color-primary); }
-        .calendar-day-modern.today::after { content: ''; position: absolute; bottom: 6px; width: 4px; height: 4px; background: var(--color-primary); border-radius: 50%; }
-        .calendar-day-modern.selected { background: var(--color-primary) !important; color: white !important; box-shadow: 0 4px 12px rgba(140, 103, 246, 0.4); }
+        .calendar-day-modern.selected { background: var(--color-primary) !important; color: white !important; }
         .calendar-day-modern.disabled { opacity: 0.2; cursor: not-allowed; }
         .calendar-footer-modern { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .calendar-btn-primary, .calendar-btn-secondary { padding: 14px; border-radius: 16px; border: none; font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; }
-        .calendar-btn-primary { background: var(--color-primary); color: white; }
-        .calendar-btn-secondary { background: var(--color-surface-container); color: var(--color-text); }
-        .calendar-error-text { color: #ff4444; font-size: 12px; text-align: center; margin-top: 6px; font-weight: 600; }
+        .calendar-btn-primary { background: var(--color-primary); color: white; padding: 14px; border-radius: 16px; border: none; font-weight: 700; cursor: pointer; }
+        .calendar-btn-secondary { background: var(--color-surface-container); color: var(--color-text); padding: 14px; border-radius: 16px; border: none; font-weight: 700; cursor: pointer; }
         @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
       `}</style>
       <div className="container" style={{ fontFamily: 'Inter, sans-serif' }}>
@@ -1077,14 +1148,21 @@ export function ScheduleScreen() {
           <button id="tour-menu" className="menu-button" onClick={() => setIsMenuOpen(true)}><Icon name="more_vert" /></button>
         </div>
         <div id="tour-profile">
-            <ProfileSwitcher key={appState.lastUsed} profiles={appState.profiles} currentProfileType={appState.lastUsed} onSwitch={handleProfileSwitch} onAddProfile={handleAddProfile} isLoading={isSwitchingProfile} />
+            <ProfileSwitcher 
+              key={appState.lastUsed} 
+              profiles={appState.profiles} 
+              currentProfileType={appState.lastUsed} 
+              onSwitch={handleProfileSwitch} 
+              onAddProfile={handleAddProfile} 
+              isLoading={isSwitchingProfile} 
+            />
         </div>
         <PracticeBanner info={practiceInfo} onClick={handlePracticeClick} />
         <PracticeDetailsModal isOpen={isPracticeModalOpen} onClose={() => setIsPracticeModalOpen(false)} info={practiceInfo} currentProfileId={currentProfileId} calendarEvents={calendarEvents} onNavigateToDate={handleNavigateToDate} />
         <div id="tour-days" className={`schedule-tabs-container ${swipeLimitReached ? 'limit-reached' : ''}`} ref={tabsContainerRef}>
           <div className="schedule-tabs" ref={tabsRef}>
             {DAYS_OF_WEEK.map((day, index) => (
-              <button key={day} className={`tab-button ${activeDayIndex === index ? 'active' : ''} ${isAnimating ? 'no-transition' : ''}`} onClick={() => handleDayChange(index)} disabled={isAnimating || isSwitchingProfile}>
+              <button key={day} className={`tab-button ${activeDayIndex === index ? 'active' : ''}`} onClick={() => handleDayChange(index)} disabled={isAnimating || isSwitchingProfile}>
                 <span className="tab-button-content">
                   <span className="tab-day-name">{day}</span>
                   <span className="tab-day-date">{format(currentWeekDates[index], 'd MMMM', { locale: ru })}</span>
@@ -1095,21 +1173,17 @@ export function ScheduleScreen() {
           </div>
         </div>
         <div id="tour-list" className="schedule-list" data-version={dataVersion} ref={scheduleListRef} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} style={{ touchAction: 'pan-y' }}>
-          {isLoading && (<div className="loading-state"><div className="loading-spinner"></div><p>Загрузка данных...</p></div>)}
-          {error && (<div className="error-state"><Icon name="error" style={{ fontSize: '24px', marginBottom: '8px' }} /><p>{error}</p><button onClick={() => window.location.reload()} style={{ marginTop: '12px', padding: '8px 16px', backgroundColor: 'var(--color-primary)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Обновить</button></div>)}
-          {!isLoading && !error && renderLessons()}
-          {!error && (<div className="overrides-toggle-container" style={{ marginTop: '16px', marginBottom: '0' }}><button className={`overrides-toggle ${applyOverrides ? 'active' : ''}`} onClick={toggleApplyOverrides} disabled={isSwitchingProfile}><Icon name="swap_horiz" /><span>Учитывать замены</span>{applyOverrides && (overrides?.overrides?.length || 0) > 0 && (<span className="overrides-badge">{overrides!.overrides.length}</span>)}</button></div>)}
+          {isLoading ? (<div className="loading-state"><div className="loading-spinner"></div><p>Загрузка...</p></div>) : error ? (<div className="error-state"><p>{error}</p><button onClick={() => window.location.reload()}>Обновить</button></div>) : renderLessons()}
+          {!error && (<div className="overrides-toggle-container"><button className={`overrides-toggle ${applyOverrides ? 'active' : ''}`} onClick={toggleApplyOverrides} disabled={isSwitchingProfile}><Icon name="swap_horiz" /><span>Учитывать замены</span></button></div>)}
         </div>
-        <DropdownMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onCheckOverrides={checkOverrides} onOpenHistory={() => setIsHistoryOpen(true)} onOpenNotes={() => setIsNotesModalOpen(true)} onInstallApp={handleInstallApp} onOpenAllEvents={() => setIsAllEventsModalOpen(true)} onStartTour={startTour} onRateApp={() => setIsRateModalOpen(true)} />
+        <DropdownMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onCheckOverrides={checkOverrides} onOpenHistory={() => setIsHistoryOpen(true)} onOpenNotes={() => setIsNotesModalOpen(true)} onInstallApp={handleInstallApp} onOpenAllEvents={() => setIsAllEventsModalOpen(true)} onStartTour={startTour} onRateApp={() => setIsRateModalOpen(true)} onAddCourse={() => setIsAddCourseOpen(true)} />
         <AddCourseModal isOpen={isAddCourseOpen} onClose={() => setIsAddCourseOpen(false)} activeWeek={activeWeekIndex} activeDay={activeDayIndex} schedule={fullSchedule} overrides={applyOverrides ? overrides : null} profileId={currentProfileId} />
         <CustomCalendar isOpen={isCalendarOpen} onClose={() => setIsCalendarOpen(false)} onSelectDate={handleDateSelect} currentDate={selectedDate} calendarEvents={calendarEvents} />
         <NoteModal lesson={lessonToEdit} onClose={() => setEditingLessonIndex(null)} onSave={handleSaveNote} savedNote={currentLessonData.notes} savedSubgroup={currentLessonData.subgroup} />
         <Snackbar message={snackbarMessage || ''} isVisible={showSnackbar} onClose={() => { setShowSnackbar(false); setSnackbarLink(null); }} link={snackbarLink} linkText={snackbarLinkText} />
         <HistoryModal isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} history={history} isTeacherView={isTeacherView} />
         <AllNotesModal isOpen={isNotesModalOpen} onClose={() => setIsNotesModalOpen(false)} profileId={currentProfileId} schedule={fullSchedule} />
-        
         <AllEventsModal isOpen={isAllEventsModalOpen} onClose={() => setIsAllEventsModalOpen(false)} calendarEvents={calendarEvents} onNavigateToDate={handleNavigateToDate} groupName={appState.profiles.student?.name} />
-        
         <RateModal isOpen={isRateModalOpen} onClose={() => setIsRateModalOpen(false)} onSubmit={handleRateSubmit} />
 
         <div id="tour-nav-panel" className="week-switcher-container">
@@ -1117,7 +1191,7 @@ export function ScheduleScreen() {
           <button className="week-switcher-button" onClick={handleWeekSwitch}>
             <div className="week-text">
               <span className="week-name">{activeWeekIndex === 0 ? 'Первая' : 'Вторая'} неделя</span>
-              {isWeekCurrent ? ( <span className="week-current"><Icon name="schedule" style={{ fontSize: '14px' }} /> Текущая</span> ) : ( <span className="week-current" style={{ color: 'var(--color-primary)', backgroundColor: 'var(--color-surface-variant)' }}> <Icon name="next_plan" style={{ fontSize: '14px' }} /> Следующая </span> )}
+              {activeWeekIndex === getWeekNumber(new Date()) ? ( <span className="week-current">Текущая</span> ) : ( <span className="week-current" style={{ color: 'var(--color-primary)' }}>Следующая</span> )}
             </div>
           </button>
           <button className="calendar-button" onClick={() => setIsCalendarOpen(true)} title="Календарь"><Icon name="event" /></button>
