@@ -1,4 +1,5 @@
 // src/screens/Schedule.tsx
+// src/screens/Schedule.tsx
 
 import { useNavigate } from 'react-router-dom';
 import ScheduleItem, { isLessonCurrent } from '../components/ScheduleItem';
@@ -264,6 +265,8 @@ function CustomCalendar({ isOpen, onClose, onSelectDate, currentDate, calendarEv
         if (!isNaN(newDate.getTime()) && newDate.getDate() === day && newDate.getMonth() === month && newDate.getFullYear() === year) { 
           setIsValid(true); 
           setViewDate(newDate); 
+          onSelectDate(newDate); 
+          onClose(); 
         } else { setIsValid(false); } 
       } else { setIsValid(false); } 
     } else { setIsValid(true); } 
@@ -383,8 +386,7 @@ function DropdownMenu({
     else if (action === 'changeGroup') { 
       localStorage.removeItem('selectedId'); 
       localStorage.removeItem('userType'); 
-      // 🔥 Переход с жесткой перезагрузкой для корректного сброса состояния
-      window.location.href = '/'; 
+      navigate('/', { replace: true }); 
     } else if (action === 'feedback') { window.open('https://t.me/ttgt1bot', '_blank'); } 
     else if (action === 'help') { onStartTour(); } 
   }; 
@@ -606,7 +608,6 @@ export function ScheduleScreen() {
         setFullSchedule(cachedProfile.schedule);
         setOverrides(cachedProfile.overrides || null);
         
-        // 🔥 ИСПРАВЛЕНИЕ: Преподаватель всегда видит события своей привязанной группы
         const sid = dataStore.getState().profiles.student?.id;
         if (sid) {
             const smeta = dataStore.getProfileMetadata(sid);
@@ -645,7 +646,6 @@ export function ScheduleScreen() {
 
         let events = info.events?.events || info.events || [];
         
-        // 🔥 ИСПРАВЛЕНИЕ: Если вы препод или данных нет, подтягиваем из группы
         const studentId = dataStore.getState().profiles.student?.id;
         if (studentId && events.length === 0) {
             const groupEvents = await scheduleApi.getInfo(studentId, formattedDate, 0, "").catch(() => null);
@@ -821,7 +821,6 @@ export function ScheduleScreen() {
     return () => unsubscribe();
   }, []);
 
-  // 🔥 ИСПРАВЛЕНИЕ: Добавление профиля теперь корректно перенаправляет, позволяя добавить новый к текущим
   const handleAddProfile = useCallback(() => { 
     navigate('/', { state: { fromAddProfile: true } }); 
   }, [navigate]);
@@ -870,7 +869,6 @@ export function ScheduleScreen() {
      setSelectedDate(addDays(selectedDate, activeWeekIndex === 0 ? 7 : -7));
   };
   
-  // 🔥 ИСПРАВЛЕНИЕ ЗАЦИКЛИВАНИЯ: Используем getTime() для стабильной зависимости
   const handleDateSelect = useCallback((date: Date) => { 
       setSelectedDate(date);
       setActiveWeekIndex(getWeekNumber(date));
@@ -951,7 +949,6 @@ export function ScheduleScreen() {
         return isWithinInterval(curDate, { start, end });
     });
 
-    // 🔥 ИСПРАВЛЕНИЕ: Преподавателям НЕ блокируем пары заглушкой события
     if (blockingEvent && !isTeacherView) {
          const day = currentWeekData.days[activeDayIndex];
          if (day && day.lessons) {
@@ -968,7 +965,6 @@ export function ScheduleScreen() {
     const isAttestation = overrides.practiceCode === '::' || overrides.practiceCode === ':';
     const isHoliday = overrides.practiceCode === '=' || overrides.practiceCode === '*';
 
-    // 🔥 ИСПРАВЛЕНИЕ: Преподавателям НЕ блокируем пары практикой
     if (overrides.isPractice && overrides.isBlocking && !isAttestation && !isHoliday && !isTeacherView) {
         const day = currentWeekData.days[activeDayIndex];
         if (day && day.lessons) {
@@ -1059,7 +1055,6 @@ export function ScheduleScreen() {
   const practiceInfo = useMemo<PracticeInfo | null>(() => {
     let info: PracticeInfo | null = null;
     const curDate = new Date(selectedDateTime);
-    // 🔥 ИСПРАВЛЕНИЕ: Поиск событий привязанной группы для баннера
     const scheduleToSearch = (isTeacherView && appState.profiles.student?.schedule) 
         ? appState.profiles.student.schedule 
         : displaySchedule;
@@ -1141,6 +1136,19 @@ export function ScheduleScreen() {
         .calendar-btn-primary { background: var(--color-primary); color: white; padding: 14px; border-radius: 16px; border: none; font-weight: 700; cursor: pointer; }
         .calendar-btn-secondary { background: var(--color-surface-container); color: var(--color-text); padding: 14px; border-radius: 16px; border: none; font-weight: 700; cursor: pointer; }
         @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        
+        /* New Cat Loader Styles */
+        .cat-loader-container { width: fit-content; height: fit-content; display: flex; align-items: center; justify-content: center; margin: 50px auto; }
+        .cat-wrapper { width: fit-content; height: fit-content; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .cat-svg-container { width: 100%; height: fit-content; display: flex; align-items: center; justify-content: center; position: relative; }
+        .cat-body { width: 80px; fill: var(--color-text); }
+        .cat-tail { position: absolute; width: 17px; top: 50%; animation: tail 0.5s ease-in infinite alternate-reverse; transform-origin: top; fill: var(--color-text); }
+        .cat-wall { width: 300px; stroke: var(--color-border); }
+        .cat-text-container { display: flex; flex-direction: column; width: 50px; position: absolute; margin: 0px 0px 100px 120px; }
+        .cat-zzz { color: var(--color-primary); font-weight: 700; font-size: 15px; animation: zzz 2s linear infinite; }
+        .cat-bigzzz { color: var(--color-primary); font-weight: 700; font-size: 25px; margin-left: 10px; animation: zzz 2.3s linear infinite; }
+        @keyframes tail { 0% { transform: rotateZ(60deg); } 50% { transform: rotateZ(0deg); } 100% { transform: rotateZ(-20deg); } }
+        @keyframes zzz { 0% { color: transparent; } 50% { color: var(--color-primary); } 100% { color: transparent; } }
       `}</style>
       <div className="container" style={{ fontFamily: 'Inter, sans-serif' }}>
         <div className="schedule-header">
@@ -1173,7 +1181,47 @@ export function ScheduleScreen() {
           </div>
         </div>
         <div id="tour-list" className="schedule-list" data-version={dataVersion} ref={scheduleListRef} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} style={{ touchAction: 'pan-y' }}>
-          {isLoading ? (<div className="loading-state"><div className="loading-spinner"></div><p>Загрузка...</p></div>) : error ? (<div className="error-state"><p>{error}</p><button onClick={() => window.location.reload()}>Обновить</button></div>) : renderLessons()}
+          {isLoading ? (
+            <div className="cat-loader-container">
+              <div className="cat-wrapper">
+                <div className="cat-svg-container">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 733 673" className="cat-body">
+                    <path d="M111.002 139.5C270.502 -24.5001 471.503 2.4997 621.002 139.5C770.501 276.5 768.504 627.5 621.002 649.5C473.5 671.5 246 687.5 111.002 649.5C-23.9964 611.5 -48.4982 303.5 111.002 139.5Z"></path>
+                    <path d="M184 9L270.603 159H97.3975L184 9Z"></path>
+                    <path d="M541 0L627.603 150H454.397L541 0Z"></path>
+                  </svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 158 564" className="cat-tail">
+                    <path d="M5.97602 76.066C-11.1099 41.6747 12.9018 0 51.3036 0V0C71.5336 0 89.8636 12.2558 97.2565 31.0866C173.697 225.792 180.478 345.852 97.0691 536.666C89.7636 553.378 73.0672 564 54.8273 564V564C16.9427 564 -5.4224 521.149 13.0712 488.085C90.2225 350.15 87.9612 241.089 5.97602 76.066Z"></path>
+                  </svg>
+                  <div className="cat-text-container">
+                    <span className="cat-bigzzz">Z</span>
+                    <span className="cat-zzz">Z</span>
+                  </div>
+                </div>
+                <div className="wallContainer">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 500 126" className="cat-wall">
+                    <line strokeWidth="6" y2="3" x2="450" y1="3" x1="50"></line>
+                    <line strokeWidth="6" y2="85" x2="400" y1="85" x1="100"></line>
+                    <line strokeWidth="6" y2="122" x2="375" y1="122" x1="125"></line>
+                    <line strokeWidth="6" y2="43" x2="500" y1="43"></line>
+                    <line strokeWidth="6" y2="1.99391" x2="115.5" y1="43.0061" x1="115.5"></line>
+                    <line strokeWidth="6" y2="2.00002" x2="189" y1="43.0122" x1="189"></line>
+                    <line strokeWidth="6" y2="2.00612" x2="262.5" y1="43.0183" x1="262.5"></line>
+                    <line strokeWidth="6" y2="2.01222" x2="336" y1="43.0244" x1="336"></line>
+                    <line strokeWidth="6" y2="2.01833" x2="409.5" y1="43.0305" x1="409.5"></line>
+                    <line strokeWidth="6" y2="43" x2="153" y1="84.0122" x1="153"></line>
+                    <line strokeWidth="6" y2="43" x2="228" y1="84.0122" x1="228"></line>
+                    <line strokeWidth="6" y2="43" x2="303" y1="84.0122" x1="303"></line>
+                    <line strokeWidth="6" y2="43" x2="378" y1="84.0122" x1="378"></line>
+                    <line strokeWidth="6" y2="84" x2="192" y1="125.012" x1="192"></line>
+                    <line strokeWidth="6" y2="84" x2="267" y1="125.012" x1="267"></line>
+                    <line strokeWidth="6" y2="84" x2="342" y1="125.012" x1="342"></line>
+                  </svg>
+                </div>
+              </div>
+              <p style={{ marginTop: '20px', color: 'var(--color-text)', opacity: 0.7, fontWeight: 500, textAlign: 'center' }}>Загрузка расписания...</p>
+            </div>
+          ) : error ? (<div className="error-state"><p>{error}</p><button onClick={() => window.location.reload()}>Обновить</button></div>) : renderLessons()}
           {!error && (<div className="overrides-toggle-container"><button className={`overrides-toggle ${applyOverrides ? 'active' : ''}`} onClick={toggleApplyOverrides} disabled={isSwitchingProfile}><Icon name="swap_horiz" /><span>Учитывать замены</span></button></div>)}
         </div>
         <DropdownMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onCheckOverrides={checkOverrides} onOpenHistory={() => setIsHistoryOpen(true)} onOpenNotes={() => setIsNotesModalOpen(true)} onInstallApp={handleInstallApp} onOpenAllEvents={() => setIsAllEventsModalOpen(true)} onStartTour={startTour} onRateApp={() => setIsRateModalOpen(true)} onAddCourse={() => setIsAddCourseOpen(true)} />
