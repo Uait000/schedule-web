@@ -1,16 +1,13 @@
 // src/components/HistoryModal.tsx
-
-import React, { useMemo } from 'react'; // ❗️ Добавлен 'useMemo'
-import { HistoryEntry, Lesson, Override } from '../types'; // ❗️ Убедитесь, что путь верный
+import React, { useMemo } from 'react';
+import { HistoryEntry, Lesson, Override } from '../types';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 
-// Иконка, как в Schedule.tsx
 const Icon = ({ name, style = {} }: { name: string; style?: React.CSSProperties }) => (
   <span className="material-icons" style={{ fontFamily: 'Material Icons', ...style }}>{name}</span>
 );
 
-// 🔥 Дублируем функцию normalizeLesson здесь, если она не экспортируется
 function normalizeLesson(lesson: any): Lesson {
   if (lesson == null || lesson === 'null' || (typeof lesson === 'object' && Object.keys(lesson).length === 0)) {
     return { noLesson: {} };
@@ -36,7 +33,6 @@ function normalizeLesson(lesson: any): Lesson {
   };
 
   const globalGroup = findGroupAnywhere(lesson);
-
   const common = lesson.CommonLesson || lesson.commonLesson;
   if (common) {
     const localGroup = findGroupAnywhere(common);
@@ -91,21 +87,14 @@ function normalizeLesson(lesson: any): Lesson {
       }
     };
   }
-  
   return { noLesson: {} };
 }
 
-/**
- * Хелпер для сравнения двух уроков (Lesson)
- * Нужен для "слияния" замен
- */
 function isSameLesson(l1: Lesson, l2: Lesson): boolean {
-  // Оба 'null' или 'noLesson'
   if (!l1 || !l2) return false;
-  if ((l1.noLesson || (typeof l1 === 'object' && Object.keys(l1).length === 0)) && 
-      (l2.noLesson || (typeof l2 === 'object' && Object.keys(l2).length === 0))) {
-    return true;
-  }
+  const isL1Empty = l1.noLesson || Object.keys(l1).length === 0;
+  const isL2Empty = l2.noLesson || Object.keys(l2).length === 0;
+  if (isL1Empty && isL2Empty) return true;
   
   const cl1 = l1.commonLesson;
   const cl2 = l2.commonLesson;
@@ -115,31 +104,20 @@ function isSameLesson(l1: Lesson, l2: Lesson): boolean {
 
   const sl1 = l1.subgroupedLesson;
   const sl2 = l2.subgroupedLesson;
-  if (sl1 && sl2) {
-     return sl1.name === sl2.name;
-  }
+  if (sl1 && sl2) return sl1.name === sl2.name;
 
-  // Один есть, другого нет
   return false;
 }
 
-/**
- * Отображает одну пару, решая, показать группу (для преподавателя) 
- * или преподавателя (для студента).
- */
 const LessonDisplay: React.FC<{ lesson: Lesson; isTeacherView: boolean }> = ({ lesson, isTeacherView }) => {
-  // 🔥 ИСПРАВЛЕНО: правильно обрабатываем null и noLesson
   if (!lesson || lesson.noLesson || (typeof lesson === 'object' && Object.keys(lesson).length === 0)) {
     return <span className="history-lesson no-lesson">Пары нет</span>;
   }
 
   if (lesson.commonLesson) {
     const { name, teacher, room, group } = lesson.commonLesson;
-    
-    // Ищем группу и внутри (commonLesson.group) и снаружи (lesson.group)
     const displayGroup = group || (lesson as any).group;
     const detail = isTeacherView ? displayGroup : teacher;
-    
     return (
       <span className="history-lesson">
         {name || 'Без названия'}
@@ -152,32 +130,23 @@ const LessonDisplay: React.FC<{ lesson: Lesson; isTeacherView: boolean }> = ({ l
   if (lesson.subgroupedLesson) {
      const { name, subgroups } = lesson.subgroupedLesson;
      const firstSub = subgroups?.[0];
-
      const group = (lesson as any).group || firstSub?.group;
      const detail = isTeacherView ? group : firstSub?.teacher;
-
      return (
       <span className="history-lesson">
-        {name || 'Без названия'} (по подгруппам)
+        {name || 'Без названия'} (подгр.)
         {detail && detail !== '' && ` (${detail})`}
         {firstSub?.room && firstSub.room !== '' && ` [${firstSub.room}]`}
       </span>
     );
   }
-
   return <span className="history-lesson no-lesson">Пары нет</span>;
 };
 
-/**
- * Отображает одну замену в 2-колоночном виде ("Было" / "Стало")
- */
 const OverrideDisplay: React.FC<{ override: Override; isTeacherView: boolean }> = ({ override, isTeacherView }) => {
-  // 🔥 ИСПРАВЛЕНО: проверяем, что override существует
   if (!override) return null;
-  
-  // 🔥 ИСПРАВЛЕНО: нормализуем уроки перед отображением
-  const normalizedShouldBe = override.shouldBe ? normalizeLesson(override.shouldBe) : { noLesson: {} };
-  const normalizedWillBe = override.willBe ? normalizeLesson(override.willBe) : { noLesson: {} };
+  const normalizedShouldBe = normalizeLesson(override.shouldBe);
+  const normalizedWillBe = normalizeLesson(override.willBe);
   
   return (
     <div className="history-override-item">
@@ -198,16 +167,15 @@ const OverrideDisplay: React.FC<{ override: Override; isTeacherView: boolean }> 
   );
 };
 
-// Хелпер для форматирования даты
-const formatDate = (entry: HistoryEntry) => {
+const formatDate = (entry: any) => {
   try {
-    if (!entry.year || !entry.month || !entry.day) {
-      return 'Дата не указана';
-    }
-    const date = new Date(entry.year, entry.month, entry.day);
-    if (isNaN(date.getTime())) {
-      return 'Неверная дата';
-    }
+    const year = entry.year || entry.overrides?.year;
+    const month = (entry.month !== undefined) ? entry.month : entry.overrides?.month;
+    const day = entry.day || entry.overrides?.day;
+
+    if (!year || day === undefined) return 'Дата не указана';
+    const date = new Date(year, month || 0, day);
+    if (isNaN(date.getTime())) return 'Неверная дата';
     return format(date, 'd MMMM yyyy, cccc', { locale: ru });
   } catch (e) {
     return 'Ошибка формата даты';
@@ -223,16 +191,22 @@ interface HistoryModalProps {
 
 export const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, history, isTeacherView }) => {
   
-  // ❗️❗️ НОВАЯ ЛОГИКА "СЛИЯНИЯ" ЗАМЕН ❗️❗️
   const processedHistory = useMemo(() => {
+    if (!Array.isArray(history)) return [];
+
     return history.map(entry => {
-      if (!entry.overrides || !Array.isArray(entry.overrides) || entry.overrides.length === 0) {
+      // Поддержка двойной вложенности overrides.overrides
+      let rawList = entry.overrides;
+      if (rawList && !Array.isArray(rawList) && (rawList as any).overrides) {
+        rawList = (rawList as any).overrides;
+      }
+
+      if (!rawList || !Array.isArray(rawList) || rawList.length === 0) {
         return { ...entry, overrides: [] };
       }
 
-      // 1. Разделяем все замены по индексу пары
       const overridesByIndex = new Map<number, Override[]>();
-      for (const override of entry.overrides) {
+      for (const override of rawList) {
         if (override.index === undefined || override.index === null) continue;
         if (!overridesByIndex.has(override.index)) {
           overridesByIndex.set(override.index, []);
@@ -242,72 +216,59 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, his
 
       const finalOverrides: Override[] = [];
 
-      // 2. Обрабатываем каждую группу пар
       for (const [index, overrides] of overridesByIndex.entries()) {
         if (overrides.length === 1) {
-          // Если замена для этой пары только одна, просто добавляем ее
           finalOverrides.push(overrides[0]);
           continue;
         }
 
-        // 3. Находим "начало цепочки" (A -> B, где A не null)
-        // и "конец цепочки" (C -> D, где D не null)
-        const starts = overrides.filter(o => o.shouldBe !== null && !o.shouldBe?.noLesson);
-        const ends = overrides.filter(o => o.willBe !== null && !o.willBe?.noLesson);
+        // 🔥 ИСПРАВЛЕНИЕ: Мы не фильтруем пустые willBe, так как это отмены
+        const starts = overrides.filter(o => {
+            const norm = normalizeLesson(o.shouldBe);
+            return !(norm.noLesson || Object.keys(norm).length === 0);
+        });
+        const ends = overrides.filter(o => {
+            const norm = normalizeLesson(o.willBe);
+            return !(norm.noLesson || Object.keys(norm).length === 0);
+        });
         
-        const usedEnds: Override[] = []; // Храним "концы", которые уже использовали
+        const usedEnds: Override[] = [];
 
-        // 4. Пытаемся "склеить"
         for (const start of starts) {
-          // Ищем "конец" C -> D, у которого C == B (т.е. start.willBe == end.shouldBe)
-          const end = ends.find(e => isSameLesson(start.willBe, e.shouldBe));
-          
+          const end = ends.find(e => isSameLesson(normalizeLesson(start.willBe), normalizeLesson(e.shouldBe)));
           if (end) {
-            // Нашли цепочку! (A -> B) + (B -> D) = (A -> D)
-            finalOverrides.push({
-              index: index,
-              shouldBe: start.shouldBe, // "Было" из "начала"
-              willBe: end.willBe         // "Стало" из "конца"
-            });
-            usedEnds.push(end); // Помечаем этот "конец" как использованный
+            finalOverrides.push({ index, shouldBe: start.shouldBe, willBe: end.willBe });
+            usedEnds.push(end);
           } else {
-            // У этого "начала" нет "конца" (e.g. A -> null), добавляем как есть
             finalOverrides.push(start);
           }
         }
         
-        // 5. Добавляем "концы" (null -> D), которые не были частью цепочки
         for (const end of ends) {
-          if (!usedEnds.includes(end)) {
-            finalOverrides.push(end);
-          }
+          if (!usedEnds.includes(end)) finalOverrides.push(end);
         }
       }
 
-      // 6. Сортируем итоговый список по номеру пары для красоты
       return { 
         ...entry, 
         overrides: finalOverrides.sort((a, b) => a.index - b.index) 
       };
     });
-  }, [history]); // ❗️❗️ КОНЕЦ НОВОЙ ЛОГИКИ ❗️❗️
+  }, [history]);
 
   if (!isOpen) return null;
+
+  const hasHistory = processedHistory.some(e => e.overrides && e.overrides.length > 0);
 
   return (
     <div className="history-modal-backdrop" onClick={onClose}>
       <div className="history-modal" onClick={(e) => e.stopPropagation()}>
-        
         <div className="history-modal-header">
           <h3 className="history-modal-title">История замен</h3>
-          <button onClick={onClose} className="history-modal-close-btn">
-            <Icon name="close" />
-          </button>
+          <button onClick={onClose} className="history-modal-close-btn"><Icon name="close" /></button>
         </div>
-
         <div className="history-modal-content">
-          {/* ❗️ Используем processedHistory */}
-          {processedHistory.length === 0 ? (
+          {!hasHistory ? (
             <div className="history-empty">
               <Icon name="history_toggle_off" style={{ fontSize: '48px' }} />
               <span>История замен пуста</span>
@@ -315,31 +276,22 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, his
             </div>
           ) : (
             <div className="history-list">
-              {/* ❗️ Используем processedHistory */}
-              {processedHistory.map((entry, index) => (
-                <div key={index} className="history-entry-card">
-                  <div className="history-entry-date">
-                    {formatDate(entry)}
+              {processedHistory.map((entry, index) => {
+                if (!entry.overrides || entry.overrides.length === 0) return null;
+                return (
+                  <div key={index} className="history-entry-card">
+                    <div className="history-entry-date">{formatDate(entry)}</div>
+                    <div className="history-override-list">
+                      {entry.overrides.map((override, oIdx) => (
+                        <OverrideDisplay key={`${oIdx}-${override.index}`} override={override} isTeacherView={isTeacherView} />
+                      ))}
+                    </div>
                   </div>
-                  <div className="history-override-list">
-                    {entry.overrides && entry.overrides.length > 0 ? (
-                      entry.overrides.map((override) => (
-                        <OverrideDisplay 
-                          key={`${override.index}-${override.shouldBe?.commonLesson?.name || 'none'}`} 
-                          override={override} 
-                          isTeacherView={isTeacherView} 
-                        />
-                      ))
-                    ) : (
-                      <div className="history-no-overrides">В этот день замен не было</div>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
-
       </div>
     </div>
   );

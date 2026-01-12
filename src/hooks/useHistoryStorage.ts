@@ -2,88 +2,41 @@ import { useState, useCallback, useEffect } from 'react';
 import { HistoryEntry, OverridesResponse, Lesson } from '../types';
 import { dataStore } from '../utils/DataStore';
 
-// 🔥 Дублируем функцию normalizeLesson здесь
 function normalizeLesson(lesson: any): Lesson {
   if (lesson == null || lesson === 'null' || (typeof lesson === 'object' && Object.keys(lesson).length === 0)) {
     return { noLesson: {} };
   }
-
   const findGroupAnywhere = (obj: any): string | undefined => {
     if (!obj) return undefined;
     if (typeof obj === 'string') return obj; 
-    if (typeof obj !== 'object') return undefined;
     const candidates = ['group', 'Group', 'studentGroup', 'StudentGroup', 'className', 'targetGroup', 'target'];
     for (const key of candidates) {
         const val = obj[key];
         if (val) {
             if (typeof val === 'string' && val.trim().length > 0) return val;
-            if (typeof val === 'object' && val.name) return val.name;
-            if (typeof val === 'object' && val.group) return val.group;
         }
     }
-    if (obj.CommonLesson) return findGroupAnywhere(obj.CommonLesson);
-    if (obj.commonLesson) return findGroupAnywhere(obj.commonLesson);
-    if (obj.willBe) return findGroupAnywhere(obj.willBe);
     return undefined;
   };
-
   const globalGroup = findGroupAnywhere(lesson);
-
   const common = lesson.CommonLesson || lesson.commonLesson;
   if (common) {
-    const localGroup = findGroupAnywhere(common);
-    return {
-      commonLesson: {
-        name: common.name || '',
-        teacher: common.teacher || '',
-        room: common.room || '',
-        group: localGroup || globalGroup 
-      }
-    };
+    return { commonLesson: { 
+      name: common.name || '', 
+      teacher: common.teacher || '', 
+      room: common.room || '', 
+      group: findGroupAnywhere(common) || globalGroup 
+    }};
   }
-
   const subgrouped = lesson.SubgroupedLesson || lesson.subgroupedLesson;
   if (subgrouped) {
-    return {
-      subgroupedLesson: {
-        name: subgrouped.name || '',
-        subgroups: (subgrouped.subgroups || []).map((sub: any) => {
-          const subLocalGroup = findGroupAnywhere(sub);
-          return {
-            teacher: sub.teacher || '',
-            room: sub.room || '',
-            subgroup_index: sub.subgroup_index || 0,
-            group: subLocalGroup || globalGroup 
-          };
-        })
-      }
-    };
+    return { subgroupedLesson: {
+      name: subgrouped.name || '',
+      subgroups: (subgrouped.subgroups || []).map((sub: any) => ({
+        teacher: sub.teacher || '', room: sub.room || '', subgroup_index: sub.subgroup_index || 0, group: findGroupAnywhere(sub) || globalGroup 
+      }))
+    }};
   }
-  
-  if (lesson.name || lesson.teacher || lesson.room) {
-    if (lesson.subgroup_index !== undefined) {
-      return {
-        subgroupedLesson: {
-          name: lesson.name || '',
-          subgroups: [{
-            teacher: lesson.teacher || '',
-            room: lesson.room || '',
-            subgroup_index: lesson.subgroup_index || 1,
-            group: lesson.group || ''
-          }]
-        }
-      };
-    }
-    return {
-      commonLesson: {
-        name: lesson.name || '',
-        teacher: lesson.teacher || '',
-        room: lesson.room || '',
-        group: lesson.group || globalGroup
-      }
-    };
-  }
-  
   return { noLesson: {} };
 }
 
@@ -91,70 +44,57 @@ export function useHistoryStorage(profileId: string | null) {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
   const loadHistory = useCallback((pid: string) => {
-    const fullHistory = dataStore.getState().overrideHistory;
+    const fullHistory = dataStore.getState().overrideHistory || [];
     const profileHistory = fullHistory.filter(entry => entry.profileId === pid);
-    // Сортируем: сначала новые (по timestamp)
     profileHistory.sort((a, b) => b.timestamp - a.timestamp);
     setHistory(profileHistory);
   }, []);
 
-  // Добавление новой записи о заменах
-  const addHistoryEntry = useCallback((newEntryData: OverridesResponse) => {
+  const addEntry = useCallback(async (newEntryData: OverridesResponse) => {
     if (!profileId) return;
 
-    // Проверяем, что в записи есть дата и сами замены
-    if (!newEntryData || !newEntryData.overrides || !Array.isArray(newEntryData.overrides) || newEntryData.overrides.length === 0) {
-      console.log("History: Пропуск записи, нет замен.", newEntryData);
-      return;
-    }
+    const rawOverrides = Array.isArray(newEntryData.overrides) 
+      ? newEntryData.overrides 
+      : (newEntryData as any).overrides?.overrides;
 
-    // Проверяем наличие даты
-    if (newEntryData.day === undefined || newEntryData.month === undefined || newEntryData.year === undefined) {
-      console.log("History: Пропуск записи, нет даты.", newEntryData);
-      return;
-    }
+    if (!rawOverrides || rawOverrides.length === 0) return;
+    if (newEntryData.day === undefined || newEntryData.month === undefined || newEntryData.year === undefined) return;
 
-    // 🔥 ИСПРАВЛЕНО: нормализуем данные перед сохранением
-    const normalizedEntryData = {
-      ...newEntryData,
-      overrides: newEntryData.overrides.map(override => ({
-        ...override,
-        shouldBe: override.shouldBe ? normalizeLesson(override.shouldBe) : { noLesson: {} },
-        willBe: override.willBe ? normalizeLesson(override.willBe) : { noLesson: {} }
-      }))
-    };
+    const normalizedOverrides = rawOverrides.map(o => ({
+      ...o,
+      shouldBe: normalizeLesson(o.shouldBe),
+      willBe: normalizeLesson(o.willBe)
+    }));
 
-    // Создаем новую запись
     const newEntry: HistoryEntry = {
-      ...normalizedEntryData,
+      ...newEntryData,
+      overrides: normalizedOverrides,
       profileId: profileId,
       timestamp: Date.now()
     };
 
-    dataStore.addOverrideHistory(newEntry);
-    
-    // Обновляем локальное состояние
-    const updatedHistory = [newEntry, ...history.filter(h => 
-      !(h.profileId === profileId && 
-        h.day === newEntryData.day && 
-        h.month === newEntryData.month && 
-        h.year === newEntryData.year)
-    )];
-    updatedHistory.sort((a, b) => b.timestamp - a.timestamp);
-    
-    setHistory(updatedHistory);
-    
-    console.log("✅ History: Добавлена новая запись.", newEntry);
-  }, [profileId, history]);
+    await dataStore.updateData(state => {
+      const currentHistory = state.overrideHistory || [];
+      const filtered = currentHistory.filter(h => 
+        !(h.profileId === profileId && h.day === newEntry.day && h.month === newEntry.month && h.year === newEntry.year)
+      );
+      return {
+        ...state,
+        overrideHistory: [newEntry, ...filtered]
+      };
+    });
 
-  // Загружаем/обновляем историю при смене profileId
+    setHistory(prev => {
+      const filtered = prev.filter(h => !(h.day === newEntry.day && h.month === newEntry.month && h.year === newEntry.year));
+      return [newEntry, ...filtered].sort((a, b) => b.timestamp - a.timestamp);
+    });
+
+  }, [profileId]);
+
   useEffect(() => {
-    if (profileId) {
-      loadHistory(profileId);
-    } else {
-      setHistory([]);
-    }
+    if (profileId) { loadHistory(profileId); } 
+    else { setHistory([]); }
   }, [profileId, loadHistory]);
 
-  return { history, addHistoryEntry };
+  return { history, addEntry };
 }

@@ -31,7 +31,11 @@ interface LessonData {
 
 const DAYS_OF_WEEK = [ 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница' ];
 
-// --- Helper Functions ---
+function getCourseFromGroupName(groupName: string): number | null {
+  if (!groupName) return null;
+  const match = groupName.match(/-(\d)/);
+  return match ? parseInt(match[1], 10) : null;
+}
 
 function groupSubgroups(lessons: any[], isTeacherView: boolean): any[] {
   if (!lessons || !Array.isArray(lessons)) return lessons;
@@ -564,7 +568,8 @@ export function ScheduleScreen() {
   const currentProfileId = localStorage.getItem('selectedId') || 'default';
   const isTeacherView = appState.lastUsed === ProfileType.TEACHER; 
   
-  const { history } = useHistoryStorage(currentProfileId);
+  // 🔥 ИСПРАВЛЕНИЕ: Извлекаем функцию addEntry для сохранения истории
+  const { history, addEntry } = useHistoryStorage(currentProfileId);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -664,6 +669,11 @@ export function ScheduleScreen() {
                 }))
             };
             setOverrides(normalizedOverrides);
+            
+            // 🔥 ИСПРАВЛЕНИЕ: Сохраняем пришедшие замены в постоянную историю
+            if (typeof addEntry === 'function') {
+                addEntry(normalizedOverrides);
+            }
         }
 
         await dataStore.updateProfileMetadata(profileId, {
@@ -691,7 +701,7 @@ export function ScheduleScreen() {
     } finally { 
         setIsLoading(false); 
     }
-  }, [fullSchedule, overrides]);
+  }, [fullSchedule, overrides, addEntry]);
 
   const handleProfileSwitch = useCallback(async (newType: ProfileType, newProfile: any) => {
     if (isSwitchingProfile) return;
@@ -932,6 +942,7 @@ export function ScheduleScreen() {
     }
   }, [selectedDateTime, currentProfileId, loadProfileData]);
 
+  // 🔥 Эффект применения замен к копии расписания
   useEffect(() => {
     if (!fullSchedule) { setDisplaySchedule(null); return; }
     const newSchedule = JSON.parse(JSON.stringify(fullSchedule)) as Schedule;
@@ -939,6 +950,8 @@ export function ScheduleScreen() {
     if (!currentWeekData) { setDisplaySchedule(newSchedule); return; }
     
     const curDate = new Date(selectedDateTime);
+    
+    // Проверка блокирующих событий календаря
     const blockingEvent = calendarEvents.find(event => {
         if (event.type === 'attestation' || event.type === 'holiday') return false; 
         const start = startOfDay(parseISO(event.dateStart));
@@ -962,7 +975,14 @@ export function ScheduleScreen() {
     const isAttestation = overrides.practiceCode === '::' || overrides.practiceCode === ':';
     const isHoliday = overrides.practiceCode === '=' || overrides.practiceCode === '*';
 
-    if (overrides.isPractice && overrides.isBlocking && !isAttestation && !isHoliday && !isTeacherView) {
+    // 🔥 ИСПРАВЛЕНИЕ: Проверка даты для блокировки практикой
+    const isPracticeActiveToday = overrides.isPractice && overrides.dateStart && overrides.dateEnd &&
+      isWithinInterval(curDate, { 
+          start: startOfDay(parseISO(overrides.dateStart)), 
+          end: endOfDay(parseISO(overrides.dateEnd)) 
+      });
+
+    if (isPracticeActiveToday && overrides.isBlocking && !isAttestation && !isHoliday && !isTeacherView) {
         const day = currentWeekData.days[activeDayIndex];
         if (day && day.lessons) {
             const practicePlaceholder = { 
@@ -971,8 +991,17 @@ export function ScheduleScreen() {
             day.lessons = day.lessons.map(() => practicePlaceholder);
         }
     }
+
+    // 🔥 ИСПРАВЛЕНИЕ: Проверка даты для индивидуальных замен
+    // Замены применяются только если дата объекта overrides совпадает с просматриваемой датой
+    const substitutesDateMatches = 
+      overrides.day === curDate.getDate() && 
+      overrides.month === curDate.getMonth() && 
+      overrides.year === curDate.getFullYear();
+
     const { overrides: overrideList } = overrides;
-    if (overrideList && overrideList.length > 0) {
+    
+    if (substitutesDateMatches && overrideList && overrideList.length > 0) {
       const day = currentWeekData.days[activeDayIndex];
       if (day && day.lessons) {
         overrideList.forEach(override => {
@@ -1050,7 +1079,6 @@ export function ScheduleScreen() {
   const currentLessonData = editingLessonIndex !== null ? getSavedLessonData(currentProfileId, activeWeekIndex, activeDayIndex, editingLessonIndex) : { notes: '', subgroup: 0 };
 
   const practiceInfo = useMemo<PracticeInfo | null>(() => {
-    // 1. Если это профиль преподавателя и не добавлен профиль группы, баннер не показываем
     if (isTeacherView && !appState.profiles.student?.id) {
         return null;
     }
@@ -1063,8 +1091,10 @@ export function ScheduleScreen() {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    
+    const groupName = appState.profiles.student?.name || "";
+    const currentCourse = getCourseFromGroupName(groupName);
 
-    // 2. Ищем событие из календаря (праздники, аттестации и т.д.)
     const activeEvent = calendarEvents.find(ev => {
         const start = startOfDay(parseISO(ev.dateStart));
         const end = endOfDay(parseISO(ev.dateEnd));
@@ -1085,13 +1115,11 @@ export function ScheduleScreen() {
             returnDate: addDays(parseISO(activeEvent.dateEnd), 1)
         };
     } else {
-        // 3. Если нет календарного события, ищем праздники или практики в оверрайдах
         const upcomingHoliday = findUpcomingEvent(calendarEvents, curDate, 4);
         if (upcomingHoliday) {
             info = upcomingHoliday;
             info.isActive = info.daysUntil <= 0;
         } else if (overrides && (overrides.isPractice || overrides.practiceTitle)) {
-           // Проверяем, не закончилась ли практика/событие в overrides для текущей выбранной даты
            const pEnd = overrides.dateEnd ? parseISO(overrides.dateEnd) : null;
            const isExpired = pEnd && curDate > endOfDay(pEnd);
 
@@ -1107,7 +1135,6 @@ export function ScheduleScreen() {
                info = { name: title, type: type, dateStart: dateStart, dateEnd: overrides.dateEnd ? parseISO(overrides.dateEnd) : null, returnDate: overrides.returnDate ? parseISO(overrides.returnDate) : null, daysUntil: daysUntil, isActive: daysUntil <= 0 };
            }
         } else {
-           // 4. Ищем практики в самом расписании
            info = findNextPractice(scheduleToSearch, activeWeekIndex, curDate);
            if (info) {
                info.isActive = info.daysUntil <= 0;
@@ -1115,14 +1142,14 @@ export function ScheduleScreen() {
         }
     }
 
-    // 🔥 ИСПРАВЛЕНИЕ ДЛЯ ГИА (III):
-    // Если событие найдено, но оно типа 'gia' (или код III/D) и еще НЕ активно (isActive = false),
-    // мы принудительно скрываем его. Это уберет банер "через 5 месяцев" для всех курсов.
+    if (info && (info.type === 'gia' || info.code === 'III' || info.code === 'D')) {
+        if (currentCourse !== 4) return null;
+    }
+
     if (info && !info.isActive && (info.type === 'gia' || info.code === 'III' || info.code === 'D')) {
         return null;
     }
 
-    // 🔥 ПРАВКА ДЛЯ ПРЕПОДАВАТЕЛЯ: 
     if (isTeacherView && info) {
         const eventStart = startOfDay(info.dateStart);
         const eventEnd = info.dateEnd ? endOfDay(info.dateEnd) : endOfDay(info.dateStart);
@@ -1134,7 +1161,7 @@ export function ScheduleScreen() {
     }
 
     return info;
-  }, [calendarEvents, selectedDateTime, overrides, displaySchedule, activeWeekIndex, isTeacherView, appState.profiles.student]);
+  }, [calendarEvents, selectedDateTime, overrides, displaySchedule, activeWeekIndex, isTeacherView, appState.profiles.student, addEntry]);
 
   const handlePracticeClick = () => { if (practiceInfo) setIsPracticeModalOpen(true); };
 
