@@ -568,14 +568,12 @@ export function ScheduleScreen() {
   const currentProfileId = localStorage.getItem('selectedId') || 'default';
   const isTeacherView = appState.lastUsed === ProfileType.TEACHER; 
   
-  // 🔥 ИСПРАВЛЕНИЕ: Извлекаем функцию addEntry для сохранения истории
   const { history, addEntry } = useHistoryStorage(currentProfileId);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
   const [swipeLimitReached, setSwipeLimitReached] = useState(false);
 
-  // 🔥 FETCH GUARD
   const lastFetchRef = useRef<string>("");
 
   const showMessage = useCallback((message: string) => { 
@@ -670,7 +668,6 @@ export function ScheduleScreen() {
             };
             setOverrides(normalizedOverrides);
             
-            // 🔥 ИСПРАВЛЕНИЕ: Сохраняем пришедшие замены в постоянную историю
             if (typeof addEntry === 'function') {
                 addEntry(normalizedOverrides);
             }
@@ -742,14 +739,10 @@ export function ScheduleScreen() {
 
       await scheduleApi.postRate(payload);
       
-      // ИСПРАВЛЕНИЕ: Мы полностью игнорируем тело ответа, так как сообщение доходит
-      // даже если сервер возвращает странный формат, который ранее интерпретировался как ошибка.
-      
       localStorage.setItem('app_rated', 'true'); 
       setIsRateModalOpen(false);
       showMessage("Спасибо за оценку! ❤️");
     } catch(e) { 
-      // Даже в случае ошибки сети считаем, что действие выполнено, чтобы не раздражать пользователя
       showMessage("Спасибо за оценку! ❤️"); 
     }
   };
@@ -933,7 +926,6 @@ export function ScheduleScreen() {
     initializeData();
   }, [navigate, resetToToday, loadProfileData]);
 
-  // 🔥 СТАБИЛЬНЫЕ ЗАВИСИМОСТИ (Fix Depth Error)
   const selectedDateTime = selectedDate.getTime();
   useEffect(() => {
     const userType = localStorage.getItem('userType') as ProfileType;
@@ -942,7 +934,6 @@ export function ScheduleScreen() {
     }
   }, [selectedDateTime, currentProfileId, loadProfileData]);
 
-  // 🔥 Эффект применения замен к копии расписания
   useEffect(() => {
     if (!fullSchedule) { setDisplaySchedule(null); return; }
     const newSchedule = JSON.parse(JSON.stringify(fullSchedule)) as Schedule;
@@ -951,7 +942,6 @@ export function ScheduleScreen() {
     
     const curDate = new Date(selectedDateTime);
     
-    // Проверка блокирующих событий календаря
     const blockingEvent = calendarEvents.find(event => {
         if (event.type === 'attestation' || event.type === 'holiday') return false; 
         const start = startOfDay(parseISO(event.dateStart));
@@ -960,29 +950,75 @@ export function ScheduleScreen() {
     });
 
     if (blockingEvent && !isTeacherView) {
-         const day = currentWeekData.days[activeDayIndex];
-         if (day && day.lessons) {
-             day.lessons = day.lessons.map(() => ({ 
+          const day = currentWeekData.days[activeDayIndex];
+          if (day && day.lessons) {
+              day.lessons = day.lessons.map(() => ({ 
                commonLesson: { name: blockingEvent.title || "Событие", teacher: '—', room: '—', group: '' } 
-             }));
-         }
-         setDisplaySchedule(newSchedule);
-         return; 
+              }));
+          }
+          setDisplaySchedule(newSchedule);
+          return; 
     }
 
-    if (!applyOverrides || !overrides) { setDisplaySchedule(newSchedule); return; }
+    if (!applyOverrides) { setDisplaySchedule(newSchedule); return; }
     
-    const isAttestation = overrides.practiceCode === '::' || overrides.practiceCode === ':';
-    const isHoliday = overrides.practiceCode === '=' || overrides.practiceCode === '*';
+    // 🔥 ГЛОБАЛЬНОЕ ИСПРАВЛЕНИЕ ДЛЯ ПРЕПОДАВАТЕЛЯ:
+    // Подготовка списка замен с учетом данных из профиля студента, если в профиле учителя пусто.
+    let effectiveOverrides: any[] = [];
+    let substitutesDateMatches = false;
 
-    // 🔥 ИСПРАВЛЕНИЕ: Проверка даты для блокировки практикой
-    const isPracticeActiveToday = overrides.isPractice && overrides.dateStart && overrides.dateEnd &&
+    if (overrides) {
+        effectiveOverrides = [...(overrides.overrides || [])];
+        substitutesDateMatches = overrides.day === curDate.getDate() && 
+                                overrides.month === curDate.getMonth() && 
+                                overrides.year === curDate.getFullYear();
+    }
+
+    // Если мы в режиме учителя и имеем данные студента, ищем замену там
+    if (isTeacherView && appState.profiles.student) {
+        const studentProfile = appState.profiles.student;
+        const stOverrides = studentProfile.overrides;
+        
+        if (stOverrides) {
+            const stDateMatches = stOverrides.day === curDate.getDate() && 
+                                  stOverrides.month === curDate.getMonth() && 
+                                  stOverrides.year === curDate.getFullYear();
+            
+            if (stDateMatches && stOverrides.overrides) {
+                substitutesDateMatches = true; // Активируем применение замен
+                const teacherName = appState.profiles.teacher?.name || "";
+                const teacherLastName = teacherName.split(' ')[0];
+
+                stOverrides.overrides.forEach((stOv: any) => {
+                    const willBe = normalizeLesson(stOv.willBe);
+                    let isRelevantToMe = false;
+
+                    if (willBe.commonLesson?.teacher?.includes(teacherLastName)) isRelevantToMe = true;
+                    if (willBe.subgroupedLesson?.subgroups.some((s: any) => s.teacher?.includes(teacherLastName))) isRelevantToMe = true;
+
+                    // Если нашли замену с нашим именем, которой еще нет в нашем списке - добавляем
+                    if (isRelevantToMe && !effectiveOverrides.some(o => o.index === stOv.index)) {
+                        const enrichedWillBe = JSON.parse(JSON.stringify(willBe));
+                        if (enrichedWillBe.commonLesson) {
+                            enrichedWillBe.commonLesson.group = studentProfile.name || "КС-1-3";
+                        }
+                        effectiveOverrides.push({ ...stOv, willBe: enrichedWillBe, shouldBe: normalizeLesson(stOv.shouldBe) });
+                    }
+                });
+            }
+        }
+    }
+
+    const isAttestation = overrides?.practiceCode === '::' || overrides?.practiceCode === ':';
+    const isHoliday = overrides?.practiceCode === '=' || overrides?.practiceCode === '*';
+
+    const isPracticeActiveToday = overrides?.isPractice && overrides?.dateStart && overrides?.dateEnd &&
       isWithinInterval(curDate, { 
           start: startOfDay(parseISO(overrides.dateStart)), 
           end: endOfDay(parseISO(overrides.dateEnd)) 
       });
 
-    if (isPracticeActiveToday && overrides.isBlocking && !isAttestation && !isHoliday && !isTeacherView) {
+    if (isPracticeActiveToday && overrides?.isBlocking && !isAttestation && !isHoliday && !isTeacherView) {
         const day = currentWeekData.days[activeDayIndex];
         if (day && day.lessons) {
             const practicePlaceholder = { 
@@ -992,19 +1028,10 @@ export function ScheduleScreen() {
         }
     }
 
-    // 🔥 ИСПРАВЛЕНИЕ: Проверка даты для индивидуальных замен
-    // Замены применяются только если дата объекта overrides совпадает с просматриваемой датой
-    const substitutesDateMatches = 
-      overrides.day === curDate.getDate() && 
-      overrides.month === curDate.getMonth() && 
-      overrides.year === curDate.getFullYear();
-
-    const { overrides: overrideList } = overrides;
-    
-    if (substitutesDateMatches && overrideList && overrideList.length > 0) {
+    if (substitutesDateMatches && effectiveOverrides.length > 0) {
       const day = currentWeekData.days[activeDayIndex];
       if (day && day.lessons) {
-        overrideList.forEach(override => {
+        effectiveOverrides.forEach(override => {
           if (day.lessons[override.index] !== undefined) {
               const originalLesson = day.lessons[override.index];
               const overrideWillBe = override.willBe;
@@ -1031,22 +1058,22 @@ export function ScheduleScreen() {
       }
     }
     setDisplaySchedule(newSchedule);
-  }, [fullSchedule, overrides, applyOverrides, calendarEvents, selectedDateTime, activeWeekIndex, activeDayIndex, isTeacherView]);
+  }, [fullSchedule, overrides, applyOverrides, calendarEvents, selectedDateTime, activeWeekIndex, activeDayIndex, isTeacherView, appState.profiles.student, appState.profiles.teacher]);
 
   const lessonsToShow = useMemo(() => {
-     const weekData = displaySchedule?.weeks?.[activeWeekIndex % 2];
-     const baseLessons = weekData?.days?.[activeDayIndex]?.lessons;
-     const lessonCount = activeDayIndex === 1 ? 6 : 5;
-     const lessonsArray = Array.from({ length: lessonCount }, (_, i) => {
-         if (activeDayIndex === 1) {
-             if (i === 3) return { noLesson: {} };
-             else if (i < 3) return (baseLessons && baseLessons[i]) ? baseLessons[i] : { noLesson: {} };
-             else { const baseIndex = i - 1; return (baseLessons && baseLessons[baseIndex]) ? baseLessons[baseIndex] : { noLesson: {} }; }
-         } else { return (baseLessons && baseLessons[i]) ? baseLessons[i] : { noLesson: {} }; }
-     });
-     const myCourses = appState.customCourses.filter(c => c.weekIndex === activeWeekIndex && c.dayIndex === activeDayIndex && c.profileId === currentProfileId);
-     myCourses.sort((a, b) => a.lessonIndex - b.lessonIndex);
-     myCourses.forEach(course => {
+      const weekData = displaySchedule?.weeks?.[activeWeekIndex % 2];
+      const baseLessons = weekData?.days?.[activeDayIndex]?.lessons;
+      const lessonCount = activeDayIndex === 1 ? 6 : 5;
+      const lessonsArray = Array.from({ length: lessonCount }, (_, i) => {
+          if (activeDayIndex === 1) {
+              if (i === 3) return { noLesson: {} };
+              else if (i < 3) return (baseLessons && baseLessons[i]) ? baseLessons[i] : { noLesson: {} };
+              else { const baseIndex = i - 1; return (baseLessons && baseLessons[baseIndex]) ? baseLessons[baseIndex] : { noLesson: {} }; }
+          } else { return (baseLessons && baseLessons[i]) ? baseLessons[i] : { noLesson: {} }; }
+      });
+      const myCourses = appState.customCourses.filter(c => c.weekIndex === activeWeekIndex && c.dayIndex === activeDayIndex && c.profileId === currentProfileId);
+      myCourses.sort((a, b) => a.lessonIndex - b.lessonIndex);
+      myCourses.forEach(course => {
         const index = course.lessonIndex;
         if (index >= 0 && index < lessonCount) {
             let targetIndex = index;
@@ -1058,8 +1085,8 @@ export function ScheduleScreen() {
               }
             }
         }
-     });
-     return lessonsArray;
+      });
+      return lessonsArray;
   }, [displaySchedule, activeWeekIndex, activeDayIndex, appState.customCourses, currentProfileId]);
 
   const renderLessons = () => {
@@ -1161,7 +1188,7 @@ export function ScheduleScreen() {
     }
 
     return info;
-  }, [calendarEvents, selectedDateTime, overrides, displaySchedule, activeWeekIndex, isTeacherView, appState.profiles.student, addEntry]);
+  }, [calendarEvents, selectedDateTime, overrides, displaySchedule, activeWeekIndex, isTeacherView, appState.profiles.student]);
 
   const handlePracticeClick = () => { if (practiceInfo) setIsPracticeModalOpen(true); };
 
