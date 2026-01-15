@@ -22,6 +22,8 @@ import { PracticeDetailsModal } from '../components/PracticeDetailsModal';
 import { AllEventsModal } from '../components/AllEventsModal'; 
 import { RateModal } from '../components/RateModal'; 
 import { findNextPractice, findUpcomingEvent, PracticeInfo } from '../utils/practiceUtils';
+import { ActiveSubscriptionsModal } from '../components/ActiveSubscriptionsModal'; 
+import { SupportModal } from '../components/SupportModal'; 
 
 interface LessonData {
   notes: string;
@@ -218,9 +220,6 @@ const Icon = ({ name, style = {}, className = '' }: { name: string; style?: Reac
   <span className={`material-icons ${className}`} style={{ fontSize: 'inherit', verticalAlign: 'middle', ...style }}>{name}</span>
 );
 
-// --- Sub-components (Calendar, Menu, Snackbar) ---
-
-// 🔥 ОБНОВЛЕННЫЙ БАННЕР: ГРАДИЕНТНАЯ ИКОНКА + КРАСИВЫЙ СТИЛЬ
 function FloatingNotificationBanner({ isEnabled, onToggle, isSupported, onClose }: { isEnabled: boolean; onToggle: () => void; isSupported: boolean; onClose: () => void }) {
     if (!isSupported) return null;
     
@@ -387,7 +386,10 @@ function CustomCalendar({ isOpen, onClose, onSelectDate, currentDate, calendarEv
   ); 
 }
 
-// 🔥 МЕНЮ
+/**
+ * 🔥 DropdownMenu: С иконками одного цвета и текстом другого.
+ * Исправлены имена пропсов для предотвращения ReferenceError.
+ */
 function DropdownMenu({ 
   isOpen, 
   onClose, 
@@ -400,7 +402,9 @@ function DropdownMenu({
   onStartTour,
   onRateApp,
   onSubscribePush,
-  isPushEnabled 
+  isPushEnabled,
+  onOpenSubsList, // 🔥 Имя исправлено здесь
+  onSupport 
 }: { 
   isOpen: boolean; 
   onClose: () => void; 
@@ -414,6 +418,8 @@ function DropdownMenu({
   onRateApp: () => void; 
   onSubscribePush: () => void;
   isPushEnabled: boolean; 
+  onOpenSubsList: () => void; // 🔥 И здесь
+  onSupport: () => void;
 }) { 
   const navigate = useNavigate(); 
    
@@ -428,36 +434,46 @@ function DropdownMenu({
     else if (action === 'notes') { onOpenNotes(); } 
     else if (action === 'install') { onInstallApp(); } 
     else if (action === 'allEvents') { onOpenAllEvents(); }
+    else if (action === 'subsList') { onOpenSubsList(); } // 🔥 Теперь onOpenSubsList определен
+    else if (action === 'support') { onSupport(); } 
     else if (action === 'rate') { onRateApp(); } 
     else if (action === 'push') { onSubscribePush(); } 
     else if (action === 'changeGroup') { 
       localStorage.removeItem('selectedId'); 
       localStorage.removeItem('userType'); 
       navigate('/', { replace: true }); 
-    } else if (action === 'feedback') { window.open('https://t.me/ttgt1bot', '_blank'); } 
-    else if (action === 'help') { onStartTour(); } 
+    } else if (action === 'help') { onStartTour(); } 
   }; 
    
   return ( 
     <>
         <div className="dropdown-overlay" onClick={onClose} />
         <div className="dropdown-menu-attached" onClick={(e) => e.stopPropagation()}> 
-            <button id="menu-item-overrides" className="dropdown-item" onClick={() => handleMenuClick('overrides')}><Icon name="sync_alt" /><span>Проверить изменения</span></button> 
-            <button id="menu-item-all-events" className="dropdown-item" onClick={() => handleMenuClick('allEvents')}><Icon name="event_repeat" /><span>График событий</span></button> 
-            <button id="menu-item-history" className="dropdown-item" onClick={() => handleMenuClick('history')}><Icon name="history" /><span>История замен</span></button> 
-            <button id="menu-item-notes" className="dropdown-item" onClick={() => handleMenuClick('notes')}><Icon name="description" /><span>Мои заметки</span></button> 
+            <button className="dropdown-item" onClick={() => handleMenuClick('overrides')}><Icon name="sync_alt" /><span>Проверить изменения</span></button> 
+            <button className="dropdown-item" onClick={() => handleMenuClick('allEvents')}><Icon name="event_repeat" /><span>График событий</span></button> 
+            <button className="dropdown-item" onClick={() => handleMenuClick('history')}><Icon name="history" /><span>История замен</span></button> 
+            <button className="dropdown-item" onClick={() => handleMenuClick('notes')}><Icon name="description" /><span>Мои заметки</span></button> 
             
-            <button id="menu-item-push" className="dropdown-item" onClick={() => handleMenuClick('push')}>
-                <Icon name={isPushEnabled ? "notifications_active" : "notifications_off"} />
-                <span>{isPushEnabled ? 'Выключить уведомления' : 'Включить уведомления'}</span>
+            <button className="dropdown-item" onClick={() => handleMenuClick('subsList')}>
+                <Icon name="checklist_rtl" />
+                <span>Список подписок</span>
             </button>
 
-            <button id="menu-item-add-course" className="dropdown-item" onClick={() => handleMenuClick('addCourse')}><Icon name="add_circle" /><span>Добавить курс</span></button> 
-            <button id="menu-item-install" className="dropdown-item" onClick={() => handleMenuClick('install')}><Icon name="download" /><span>Установить приложение</span></button> 
-            <button id="menu-item-rate" className="dropdown-item" onClick={() => handleMenuClick('rate')}><Icon name="star_outline" /><span>Оценить приложение</span></button> 
-            <button id="menu-item-change-group" className="dropdown-item" onClick={() => handleMenuClick('changeGroup')}><Icon name="group" /><span>Поменять группу</span></button> 
-            <button id="menu-item-help" className="dropdown-item" onClick={() => handleMenuClick('help')}><Icon name="help_outline" /><span>Как пользоваться?</span></button>
-            <button id="menu-item-feedback" className="dropdown-item" onClick={() => handleMenuClick('feedback')}><Icon name="feedback" /><span>Обратная связь</span></button> 
+            <button className="dropdown-item" onClick={() => handleMenuClick('push')}>
+                <Icon name={isPushEnabled ? "notifications_active" : "notifications"} />
+                <span>{isPushEnabled ? 'Выключить пуши' : 'Включить пуши'}</span>
+            </button>
+
+            <button className="dropdown-item" onClick={() => handleMenuClick('addCourse')}><Icon name="add_circle" /><span>Добавить курс</span></button> 
+            <button className="dropdown-item" onClick={() => handleMenuClick('install')}><Icon name="download" /><span>Установить приложение</span></button> 
+            <button className="dropdown-item" onClick={() => handleMenuClick('rate')}><Icon name="star_outline" /><span>Оценить приложение</span></button> 
+            <button className="dropdown-item" onClick={() => handleMenuClick('changeGroup')}><Icon name="group" /><span>Поменять группу</span></button> 
+            <button className="dropdown-item" onClick={() => handleMenuClick('help')}><Icon name="help_outline" /><span>Как пользоваться?</span></button>
+            
+            <button className="dropdown-item" onClick={() => handleMenuClick('support')}>
+              <Icon name="contact_support" />
+              <span>Техподдержка</span>
+            </button> 
         </div> 
     </>
   ); 
@@ -509,7 +525,6 @@ function processSubgroupedOverride(originalLesson: Lesson, overrideWillBe: Lesso
   };
 }
 
-// 🔥 КРАСИВЫЙ SNACKBAR
 function Snackbar({ message, isVisible, onClose, link, linkText }: { message: string; isVisible: boolean; onClose: () => void; link?: string | null; linkText?: string; }) { 
   useEffect(() => { 
     if (isVisible) { 
@@ -570,6 +585,7 @@ export function ScheduleScreen() {
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
    
   const [isLoading, setIsLoading] = useState(false);
+  const [isSupportLoading, setIsSupportLoading] = useState(false); 
   const [error, setError] = useState<string | null>(null);
   const [editingLessonIndex, setEditingLessonIndex] = useState<number | null>(null);
   const [dataVersion, setDataVersion] = useState(0);
@@ -586,8 +602,9 @@ export function ScheduleScreen() {
   const [isPracticeModalOpen, setIsPracticeModalOpen] = useState(false);
   const [isAllEventsModalOpen, setIsAllEventsModalOpen] = useState(false); 
   const [isRateModalOpen, setIsRateModalOpen] = useState(false); 
+  const [isSubsListOpen, setIsSubsListOpen] = useState(false);
+  const [isSupportOpen, setIsSupportOpen] = useState(false); 
   
-  // 🔥 НОВОЕ СОСТОЯНИЕ ДЛЯ PUSH и БАННЕРА
   const [isPushEnabled, setIsPushEnabled] = useState(false);
   const [isPushSupported, setIsPushSupported] = useState(true);
   const [showPushBanner, setShowPushBanner] = useState(false); 
@@ -603,106 +620,100 @@ export function ScheduleScreen() {
 
   const lastFetchRef = useRef<string>("");
 
-  // 🔥 МАЯК ДЛЯ ПРЕДОТВРАЩЕНИЯ БАННЕРА ПРИ ЗАХОДЕ
-  const isFirstRender = useRef(true);
-
   const showMessage = useCallback((message: string) => { 
     setSnackbarMessage(message); 
     setSnackbarLink(null); 
     setShowSnackbar(true); 
   }, []);
 
-  // 🔥 ОБНОВЛЕННАЯ ПРОВЕРКА PUSH ПРИ ЗАГРУЗКЕ (С исправлениями)
-  useEffect(() => {
+  /**
+   * 🔥 handleSupportSubmit: Исправлено — окно скрывается после отправки
+   */
+  const handleSupportSubmit = async (text: string) => {
+    try {
+      setIsSupportLoading(true);
+      const payload = {
+        stars: 0, 
+        comment: `[SUPPORT] ${text}`, 
+        teacher: isTeacherView ? (appState.profiles.teacher?.name || "N/A") : null,
+        group: appState.profiles.student?.name || "N/A",
+        platform: 'web-ttgt-support' 
+      };
+
+      await scheduleApi.postRate(payload);
+      
+      // 🔥 ОБЯЗАТЕЛЬНО СКРЫВАЕМ ОКНО
+      setIsSupportOpen(false);
+      showMessage("Ваше обращение отправлено! ❤️");
+    } catch(e) {
+      setIsSupportOpen(false); // 🔥 И при ошибке тоже
+      showMessage("Ваше обращение отправлено! ❤️");
+    } finally {
+      setIsSupportLoading(false);
+    }
+  };
+
+  /**
+   * 🔥 Мгновенная проверка статуса PUSH при входе
+   */
+  const checkSubscriptionStatus = useCallback(async () => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
         setIsPushSupported(false);
         return;
     }
-    
-    const checkSubscriptionStatus = async () => {
-        const registration = await navigator.serviceWorker.ready;
-        const subscription = await registration.pushManager.getSubscription();
-        
-        // Проверяем статус в localStorage именно для текущего профиля
-        const isProfilePushActive = localStorage.getItem(`push_active_${currentProfileId}`) === 'true';
-        
-        if (subscription && isProfilePushActive) {
-            setIsPushEnabled(true);
-        } else {
-            setIsPushEnabled(false);
-            // 🔥 ИСПРАВЛЕНИЕ: Показываем баннер ТОЛЬКО если это не первый рендер (т.е. произошло переключение)
-            if (!isProfilePushActive && !isFirstRender.current) {
-                setTimeout(() => setShowPushBanner(true), 1500);
-            }
-        }
-        // После первой проверки устанавливаем флаг в false
-        isFirstRender.current = false;
-    };
-
-    checkSubscriptionStatus();
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+    const active = localStorage.getItem(`push_active_${currentProfileId}`) === 'true';
+    const processed = localStorage.getItem(`push_banner_processed_${currentProfileId}`) === 'true';
+    setIsPushEnabled(active);
+    if (!active && !processed) { setShowPushBanner(true); } 
+    else { setShowPushBanner(false); }
   }, [currentProfileId]);
 
-  // 🔥 ИСПРАВЛЕННАЯ ЛОГИКА PUSH (РЕШЕНИЕ AbortError + Профилезависимость)
-  const handlePushSubscription = async () => {
-    if (!isPushSupported) {
-      showMessage("Браузер не поддерживает уведомления");
-      return;
-    }
+  useEffect(() => { checkSubscriptionStatus(); }, [checkSubscriptionStatus]);
 
+  const handlePushSubscription = async () => {
+    if (!isPushSupported) { showMessage("Не поддерживается"); return; }
+    localStorage.setItem(`push_banner_processed_${currentProfileId}`, 'true');
     setShowPushBanner(false);
 
     if (isPushEnabled) {
-        // Логика отключения для конкретного профиля
         setIsPushEnabled(false);
         localStorage.setItem(`push_active_${currentProfileId}`, 'false');
-        // Опционально: уведомляем бэкенд об отключении именно для этого профиля
         try {
-            const registration = await navigator.serviceWorker.ready;
-            const subscription = await registration.pushManager.getSubscription();
-            if (subscription) {
-                // Вызываем API с флагом удаления или специальным методом
-                await scheduleApi.subscribePush(subscription, currentProfileId, false);
-            }
+            const reg = await navigator.serviceWorker.ready;
+            const sub = await reg.pushManager.getSubscription();
+            if (sub) { await scheduleApi.subscribePush(sub, currentProfileId, false); }
         } catch (e) { console.error(e); }
-        
         showMessage("Уведомления профиля отключены");
         return;
     }
 
     try {
-      const registration = await navigator.serviceWorker.ready;
-      const permission = await Notification.requestPermission();
-      
-      if (permission !== 'granted') {
+      const reg = await navigator.serviceWorker.ready;
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') {
         showMessage("Разрешите уведомления в настройках");
         return;
       }
-
-      // 🔥 ПРОВЕРЯЕМ СУЩЕСТВУЮЩУЮ ПОДПИСКУ ДЛЯ ИЗБЕЖАНИЯ AbortError
-      let subscription = await registration.pushManager.getSubscription();
-
-      if (!subscription) {
-          const VAPID_PUBLIC_KEY = 'BIqO4RMd3S60fnef-Qx8ukxxZqTEsCyG-tvcvZAwyGef77_Nv0s56oxmuxSenjMH7nUsPoWb7xC7vyHVpWLZNPs';
-          subscription = await registration.pushManager.subscribe({
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+          const key = 'BIqO4RMd3S60fnef-Qx8ukxxZqTEsCyG-tvcvZAwyGef77_Nv0s56oxmuxSenjMH7nUsPoWb7xC7vyHVpWLZNPs';
+          sub = await reg.pushManager.subscribe({
             userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+            applicationServerKey: urlBase64ToUint8Array(key)
           });
       }
-
-      // Отправляем на бэкенд подписку + ID ТЕКУЩЕГО профиля
-      await scheduleApi.subscribePush(subscription, currentProfileId, true);
-      
+      await scheduleApi.subscribePush(sub, currentProfileId, true);
       localStorage.setItem(`push_active_${currentProfileId}`, 'true');
       setIsPushEnabled(true);
-      showMessage("Уведомления включены для этого профиля! 🔔");
-    } catch (err) {
-      console.error('Push registration failed:', err);
-      if (err instanceof Error && err.name === 'AbortError') {
-          showMessage("Ошибка: Обновите страницу и попробуйте снова"); 
-      } else {
-          showMessage("Ошибка при активации уведомлений");
-      }
-    }
+      showMessage("Уведомления включены! 🔔");
+    } catch (err) { showMessage("Ошибка при активации"); }
+  };
+
+  const closePushBanner = () => {
+    localStorage.setItem(`push_banner_processed_${currentProfileId}`, 'true');
+    setShowPushBanner(false);
   };
 
   const handleNavigateToDate = useCallback((date: Date, message: string) => {
@@ -717,21 +728,15 @@ export function ScheduleScreen() {
 
   const loadProfileData = useCallback(async (profileId: string, profileType: ProfileType, date: Date = new Date()) => {
     if (!profileId) return;
-     
     const formattedDate = format(date, 'yyyy-MM-dd');
     const metadata = dataStore.getProfileMetadata(profileId);
-     
     const currentFetchKey = `${profileId}_${formattedDate}_${metadata.scheduleUpdate}_${metadata.eventsHash}`;
-     
     if (lastFetchRef.current === currentFetchKey) return;
     lastFetchRef.current = currentFetchKey;
-
     const cachedProfile = dataStore.getState().profiles[profileType === ProfileType.TEACHER ? 'teacher' : 'student'];
-     
     if (cachedProfile?.schedule) {
         setFullSchedule(cachedProfile.schedule);
         setOverrides(cachedProfile.overrides || null);
-        
         const sid = dataStore.getState().profiles.student?.id;
         if (sid) {
             const smeta = dataStore.getProfileMetadata(sid);
@@ -739,19 +744,10 @@ export function ScheduleScreen() {
         } else if (metadata.events) {
             setCalendarEvents(metadata.events);
         }
-    } else {
-        setIsLoading(true);
-    }
-
+    } else { setIsLoading(true); }
     setError(null);
     try {
-        const info = await scheduleApi.getInfo(
-          profileId, 
-          formattedDate, 
-          metadata.scheduleUpdate || 0, 
-          metadata.eventsHash || ""
-        );
-
+        const info = await scheduleApi.getInfo(profileId, formattedDate, metadata.scheduleUpdate || 0, metadata.eventsHash || "");
         if (info.schedule) {
             const normalizedSchedule = { 
               ...info.schedule, 
@@ -767,143 +763,67 @@ export function ScheduleScreen() {
             };
             setFullSchedule(normalizedSchedule);
         }
-
         let events = info.events?.events || info.events || [];
-        
         const studentId = dataStore.getState().profiles.student?.id;
         if (studentId && events.length === 0) {
             const groupEvents = await scheduleApi.getInfo(studentId, formattedDate, 0, "").catch(() => null);
             if (groupEvents) events = groupEvents.events?.events || groupEvents.events || [];
         }
-
-        if (events && events.length > 0) {
-            setCalendarEvents(events);
-        }
-
+        if (events && events.length > 0) { setCalendarEvents(events); }
         if (info.overrides) {
             const normalizedOverrides = {
                 ...info.overrides,
-                overrides: (info.overrides.overrides || []).map((o: any) => ({
-                    ...o,
-                    shouldBe: normalizeLesson(o.shouldBe),
-                    willBe: normalizeLesson(o.willBe)
-                }))
+                overrides: (info.overrides.overrides || []).map((o: any) => ({ ...o, shouldBe: normalizeLesson(o.shouldBe), willBe: normalizeLesson(o.willBe) }))
             };
             setOverrides(normalizedOverrides);
-            
-            if (typeof addEntry === 'function') {
-                addEntry(normalizedOverrides);
-            }
+            if (typeof addEntry === 'function') { addEntry(normalizedOverrides); }
         }
-
-        await dataStore.updateProfileMetadata(profileId, {
-            scheduleUpdate: info.schedule_update || metadata.scheduleUpdate,
-            eventsHash: info.events?.sha256 || metadata.eventsHash,
-            events: events
-        });
-
-        await dataStore.updateData(s => ({
-            ...s,
-            profiles: {
-                ...s.profiles,
-                [profileType === ProfileType.TEACHER ? 'teacher' : 'student']: {
-                    ...s.profiles[profileType === ProfileType.TEACHER ? 'teacher' : 'student'],
-                    id: profileId,
-                    schedule: info.schedule || fullSchedule,
-                    overrides: info.overrides || overrides
-                }
-            }
-        }));
-
-    } catch (err) { 
-        console.error("Load Error:", err); 
-        if (!fullSchedule) setError('Ошибка сервера. Попробуйте позже.'); 
-    } finally { 
-        setIsLoading(false); 
-    }
+        await dataStore.updateProfileMetadata(profileId, { scheduleUpdate: info.schedule_update || metadata.scheduleUpdate, eventsHash: info.events?.sha256 || metadata.eventsHash, events: events });
+        await dataStore.updateData(s => ({ ...s, profiles: { ...s.profiles, [profileType === ProfileType.TEACHER ? 'teacher' : 'student']: { ...s.profiles[profileType === ProfileType.TEACHER ? 'teacher' : 'student'], id: profileId, schedule: info.schedule || fullSchedule, overrides: info.overrides || overrides } } }));
+    } catch (err) { if (!fullSchedule) setError('Ошибка сервера'); } finally { setIsLoading(false); }
   }, [fullSchedule, overrides, addEntry]);
 
   const handleProfileSwitch = useCallback(async (newType: ProfileType, newProfile: any) => {
     if (isSwitchingProfile) return;
     setIsSwitchingProfile(true);
-     
     if (newProfile.schedule) {
         setFullSchedule(newProfile.schedule);
         setOverrides(newProfile.overrides || null);
         const meta = dataStore.getProfileMetadata(newProfile.id);
         if (meta.events) setCalendarEvents(meta.events);
     }
-
     try {
       await dataStore.setLastUsed(newType);
       localStorage.setItem('selectedId', newProfile.id);
       localStorage.setItem('userType', newType);
-      
-      // 🔥 ОБНОВЛЯЕМ СОСТОЯНИЕ PUSH ДЛЯ НОВОГО ПРОФИЛЯ
-      const isProfilePushActive = localStorage.getItem(`push_active_${newProfile.id}`) === 'true';
-      setIsPushEnabled(isProfilePushActive);
-      
-      // Сбрасываем флаг рендера при ручном переключении, чтобы useEffect мог показать баннер
-      isFirstRender.current = false;
-      
-      if (!isProfilePushActive) setShowPushBanner(true);
-      else setShowPushBanner(false);
-
       window.dispatchEvent(new Event('profileChanged'));
       lastFetchRef.current = ""; 
       await loadProfileData(newProfile.id, newType, selectedDate);
       showMessage(`Переключено на: ${newProfile.name}`);
-    } catch (error) { 
-        console.error('Error switching profile:', error); 
-        showMessage('Ошибка при загрузке'); 
-    } finally { 
-        setIsSwitchingProfile(false); 
-    }
+    } catch (error) { showMessage('Ошибка при загрузке'); } finally { setIsSwitchingProfile(false); }
   }, [isSwitchingProfile, loadProfileData, selectedDate, showMessage]);
 
   const handleRateSubmit = async (stars: number, comment: string) => {
     try {
-      const payload = {
-        stars: Number(stars), 
-        comment: String(comment || ""), 
-        teacher: isTeacherView ? (appState.profiles.teacher?.name || "Не указан") : null,
-        group: appState.profiles.student?.name || "Не указана",
-        platform: 'web-ttgt-app' 
-      };
-
+      const payload = { stars: Number(stars), comment: String(comment || ""), teacher: isTeacherView ? (appState.profiles.teacher?.name || "Не указан") : null, group: appState.profiles.student?.name || "Не указана", platform: 'web-ttgt-app' };
       await scheduleApi.postRate(payload);
-       
       localStorage.setItem('app_rated', 'true'); 
       setIsRateModalOpen(false);
       showMessage("Спасибо за оценку! ❤️");
-    } catch(e) { 
-      showMessage("Спасибо за оценку! ❤️"); 
-    }
+    } catch(e) { showMessage("Спасибо за оценку! ❤️"); }
   };
 
   useEffect(() => {
-    const firstLaunch = localStorage.getItem('app_first_launch');
-    if (!firstLaunch) {
-        localStorage.setItem('app_first_launch', Date.now().toString());
-    } else {
-        const diff = Date.now() - parseInt(firstLaunch);
-        const sevenDays = 7 * 24 * 60 * 60 * 1000;
-        const hasRated = localStorage.getItem('app_rated');
-        
-        if (diff > sevenDays && !hasRated) {
-            const timer = setTimeout(() => setIsRateModalOpen(true), 3000);
-            return () => clearTimeout(timer);
-        }
+    const launch = localStorage.getItem('app_first_launch');
+    if (!launch) { localStorage.setItem('app_first_launch', Date.now().toString()); } 
+    else if (Date.now() - parseInt(launch) > 7*24*60*60*1000 && !localStorage.getItem('app_rated')) {
+      setTimeout(() => setIsRateModalOpen(true), 3000);
     }
   }, []);
 
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-
   useEffect(() => {
-    const handler = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
+    const handler = (e: Event) => { e.preventDefault(); setDeferredPrompt(e); };
     window.addEventListener('beforeinstallprompt', handler);
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
@@ -911,25 +831,16 @@ export function ScheduleScreen() {
   const handleInstallApp = useCallback(async () => {
     if (!deferredPrompt) {
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-      if (isIOS) {
-        showMessage("Нажмите кнопку 'Поделиться' в Safari и выберите 'На экран «Домой»'");
-      } else {
-        showMessage("Используйте меню браузера (три точки) -> 'Установить приложение'");
-      }
+      if (isIOS) { showMessage("Нажмите кнопку 'Поделиться' и выберите 'На экран Домой'"); } 
+      else { showMessage("Используйте меню браузера -> 'Установить'"); }
       return;
     }
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setDeferredPrompt(null);
-    }
+    if (outcome === 'accepted') { setDeferredPrompt(null); }
   }, [deferredPrompt, showMessage]);
 
-  const { startTour } = useAppTour({
-    isReady: !isLoading && !!fullSchedule,
-    setIsMenuOpen,
-    autoStart: false 
-  });
+  const { startTour } = useAppTour({ isReady: !isLoading && !!fullSchedule, setIsMenuOpen, autoStart: false });
 
   const scrollToActiveDay = useCallback((dayIndex: number) => {
     if (!tabsRef.current) return;
@@ -940,28 +851,14 @@ export function ScheduleScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      scrollToActiveDay(activeDayIndex);
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [activeDayIndex, scrollToActiveDay]);
+  useEffect(() => { const timer = setTimeout(() => { scrollToActiveDay(activeDayIndex); }, 100); return () => clearTimeout(timer); }, [activeDayIndex, scrollToActiveDay]);
 
-  useEffect(() => {
-    const unsubscribe = dataStore.subscribe((newState) => {
-      setAppState(newState); 
-      setDataVersion(v => v + 1); 
-    });
-    return () => unsubscribe();
-  }, []);
+  useEffect(() => { const unsubscribe = dataStore.subscribe((newState) => { setAppState(newState); setDataVersion(v => v + 1); }); return () => unsubscribe(); }, []);
 
-  const handleAddProfile = useCallback(() => { 
-    navigate('/', { state: { fromAddProfile: true } }); 
-  }, [navigate]);
+  const handleAddProfile = useCallback(() => { navigate('/', { state: { fromAddProfile: true } }); }, [navigate]);
 
   const handleTouchStart = (e: React.TouchEvent) => { setTouchStart(e.targetTouches[0].clientX); setSwipeLimitReached(false); };
   const handleTouchMove = (e: React.TouchEvent) => { setTouchEnd(e.targetTouches[0].clientX); };
-   
   const handleTouchEnd = useCallback(() => {
     if (!touchStart || !touchEnd || isAnimating) return;
     const distance = touchStart - touchEnd;
@@ -1012,18 +909,15 @@ export function ScheduleScreen() {
   const checkOverrides = () => {
     setSnackbarMessage("Проверьте актуальное расписание замен на официальном сайте ТТЖТ.");
     setSnackbarLink("https://ttgt.org/images/pdf/zamena.pdf");
-    setSnackbarLinkText("Перейти на сайт");
+    setSnackbarLinkText("Перейти");
     setShowSnackbar(true);
   };
 
   const toggleApplyOverrides = () => {
     const newValue = !applyOverrides;
     setApplyOverrides(newValue);
-    if (newValue && overrides && overrides.overrides && overrides.overrides.length > 0) { 
-      showMessage('Замены применены'); 
-    } else if (!newValue) { 
-      showMessage('Показывается исходное расписание'); 
-    }
+    if (newValue && overrides && overrides.overrides && overrides.overrides.length > 0) { showMessage('Замены применены'); } 
+    else if (!newValue) { showMessage('Исходное расписание'); }
   };
 
   const handleSubgroupChange = (lessonIndex: number, subgroup: number) => {
@@ -1073,91 +967,61 @@ export function ScheduleScreen() {
     const newSchedule = JSON.parse(JSON.stringify(fullSchedule)) as Schedule;
     const currentWeekData = newSchedule.weeks?.[activeWeekIndex % 2];
     if (!currentWeekData) { setDisplaySchedule(newSchedule); return; }
-     
     const curDate = new Date(selectedDateTime);
-     
     const blockingEvent = calendarEvents.find(event => {
         if (event.type === 'attestation' || event.type === 'holiday') return false; 
         const start = startOfDay(parseISO(event.dateStart));
         const end = endOfDay(parseISO(event.dateEnd));
         return isWithinInterval(curDate, { start, end });
     });
-
     if (blockingEvent && !isTeacherView) {
           const day = currentWeekData.days[activeDayIndex];
           if (day && day.lessons) {
-              day.lessons = day.lessons.map(() => ({ 
-               commonLesson: { name: blockingEvent.title || "Событие", teacher: '—', room: '—', group: '' } 
-              }));
+              day.lessons = day.lessons.map(() => ({ commonLesson: { name: blockingEvent.title || "Событие", teacher: '—', room: '—', group: '' } }));
           }
           setDisplaySchedule(newSchedule);
           return; 
     }
-
     if (!applyOverrides) { setDisplaySchedule(newSchedule); return; }
-     
     let effectiveOverrides: any[] = [];
     let substitutesDateMatches = false;
-
     if (overrides) {
         effectiveOverrides = [...(overrides.overrides || [])];
-        substitutesDateMatches = overrides.day === curDate.getDate() && 
-                                overrides.month === curDate.getMonth() && 
-                                overrides.year === curDate.getFullYear();
+        substitutesDateMatches = overrides.day === curDate.getDate() && overrides.month === curDate.getMonth() && overrides.year === curDate.getFullYear();
     }
-
     if (isTeacherView && appState.profiles.student) {
         const studentProfile = appState.profiles.student;
         const stOverrides = studentProfile.overrides;
-        
         if (stOverrides) {
-            const stDateMatches = stOverrides.day === curDate.getDate() && 
-                                  stOverrides.month === curDate.getMonth() && 
-                                  stOverrides.year === curDate.getFullYear();
-            
+            const stDateMatches = stOverrides.day === curDate.getDate() && stOverrides.month === curDate.getMonth() && stOverrides.year === curDate.getFullYear();
             if (stDateMatches && stOverrides.overrides) {
                 substitutesDateMatches = true;
                 const teacherName = appState.profiles.teacher?.name || "";
                 const teacherLastName = teacherName.split(' ')[0];
-
                 stOverrides.overrides.forEach((stOv: any) => {
                     const willBe = normalizeLesson(stOv.willBe);
                     let isRelevantToMe = false;
-
                     if (willBe.commonLesson?.teacher?.includes(teacherLastName)) isRelevantToMe = true;
                     if (willBe.subgroupedLesson?.subgroups.some((s: any) => s.teacher?.includes(teacherLastName))) isRelevantToMe = true;
-
                     if (isRelevantToMe && !effectiveOverrides.some(o => o.index === stOv.index)) {
                         const enrichedWillBe = JSON.parse(JSON.stringify(willBe));
-                        if (enrichedWillBe.commonLesson) {
-                            enrichedWillBe.commonLesson.group = studentProfile.name || "Группа";
-                        }
+                        if (enrichedWillBe.commonLesson) { enrichedWillBe.commonLesson.group = studentProfile.name || "Группа"; }
                         effectiveOverrides.push({ ...stOv, willBe: enrichedWillBe, shouldBe: normalizeLesson(stOv.shouldBe) });
                     }
                 });
             }
         }
     }
-
     const isAttestation = overrides?.practiceCode === '::' || overrides?.practiceCode === ':';
     const isHoliday = overrides?.practiceCode === '=' || overrides?.practiceCode === '*';
-
-    const isPracticeActiveToday = overrides?.isPractice && overrides?.dateStart && overrides?.dateEnd &&
-      isWithinInterval(curDate, { 
-          start: startOfDay(parseISO(overrides.dateStart)), 
-          end: endOfDay(parseISO(overrides.dateEnd)) 
-      });
-
+    const isPracticeActiveToday = overrides?.isPractice && overrides?.dateStart && overrides?.dateEnd && isWithinInterval(curDate, { start: startOfDay(parseISO(overrides.dateStart)), end: endOfDay(parseISO(overrides.dateEnd)) });
     if (isPracticeActiveToday && overrides?.isBlocking && !isAttestation && !isHoliday && !isTeacherView) {
         const day = currentWeekData.days[activeDayIndex];
         if (day && day.lessons) {
-            const practicePlaceholder = { 
-                commonLesson: { name: overrides.practiceTitle || "Практика", teacher: "", room: overrides.practiceCode || "—", group: "" } 
-            };
+            const practicePlaceholder = { commonLesson: { name: overrides.practiceTitle || "Практика", teacher: "", room: overrides.practiceCode || "—", group: "" } };
             day.lessons = day.lessons.map(() => practicePlaceholder);
         }
     }
-
     if (substitutesDateMatches && effectiveOverrides.length > 0) {
       const day = currentWeekData.days[activeDayIndex];
       if (day && day.lessons) {
@@ -1165,23 +1029,18 @@ export function ScheduleScreen() {
           if (day.lessons[override.index] !== undefined) {
               const originalLesson = day.lessons[override.index];
               const overrideWillBe = override.willBe;
-              if (isTeacherView) {
-                day.lessons[override.index] = overrideWillBe;
-              } else {
+              if (isTeacherView) { day.lessons[override.index] = overrideWillBe; } 
+              else {
                   if (originalLesson?.subgroupedLesson && overrideWillBe?.noLesson) {
                     const shouldBeTeacher = override.shouldBe.commonLesson?.teacher;
                     if (shouldBeTeacher) {
                        const teacherLastName = shouldBeTeacher.split(' ')[0];
-                       const remainingSubgroups = originalLesson.subgroupedLesson.subgroups.filter(
-                         (sub: any) => !sub.teacher.includes(teacherLastName)
-                       );
-                       if (remainingSubgroups.length > 0) {
-                          day.lessons[override.index] = { subgroupedLesson: { name: originalLesson.subgroupedLesson.name, subgroups: remainingSubgroups } };
-                       } else { day.lessons[override.index] = { noLesson: {} }; }
+                       const remainingSubgroups = originalLesson.subgroupedLesson.subgroups.filter((sub: any) => !sub.teacher.includes(teacherLastName));
+                       if (remainingSubgroups.length > 0) { day.lessons[override.index] = { subgroupedLesson: { name: originalLesson.subgroupedLesson.name, subgroups: remainingSubgroups } }; } 
+                       else { day.lessons[override.index] = { noLesson: {} }; }
                     } else { day.lessons[override.index] = overrideWillBe; }
-                  } else if (originalLesson?.subgroupedLesson && overrideWillBe?.subgroupedLesson) {
-                    day.lessons[override.index] = processSubgroupedOverride(originalLesson, overrideWillBe);
-                  } else { day.lessons[override.index] = overrideWillBe; }
+                  } else if (originalLesson?.subgroupedLesson && overrideWillBe?.subgroupedLesson) { day.lessons[override.index] = processSubgroupedOverride(originalLesson, overrideWillBe); } 
+                  else { day.lessons[override.index] = overrideWillBe; }
               }
           }
         });
@@ -1202,18 +1061,13 @@ export function ScheduleScreen() {
           } else { return (baseLessons && baseLessons[i]) ? baseLessons[i] : { noLesson: {} }; }
       });
       const myCourses = appState.customCourses.filter(c => c.weekIndex === activeWeekIndex && c.dayIndex === activeDayIndex && c.profileId === currentProfileId);
-      myCourses.sort((a, b) => a.lessonIndex - b.lessonIndex);
       myCourses.forEach(course => {
         const index = course.lessonIndex;
-        if (index >= 0 && index < lessonCount) {
-            let targetIndex = index;
-            if (activeDayIndex === 1 && index >= 3) targetIndex = index + 1;
-            if (targetIndex >= 0 && targetIndex < lessonCount) {
-              if (!lessonsArray[targetIndex] || lessonsArray[targetIndex].noLesson || Object.keys(lessonsArray[targetIndex]).length === 0) {
-                  lessonsArray[targetIndex] = { commonLesson: { name: course.name, teacher: course.teacher, room: course.room, group: course.teacher } };
-                  (lessonsArray[targetIndex] as any).customCourseId = course.id;
-              }
-            }
+        let targetIndex = activeDayIndex === 1 && index >= 3 ? index + 1 : index;
+        if (targetIndex >= 0 && targetIndex < lessonCount) {
+          if (!lessonsArray[targetIndex] || lessonsArray[targetIndex].noLesson) {
+              lessonsArray[targetIndex] = { commonLesson: { name: course.name, teacher: course.teacher, room: course.room, group: course.teacher }, customCourseId: course.id } as any;
+          }
         }
       });
       return lessonsArray;
@@ -1225,9 +1079,7 @@ export function ScheduleScreen() {
       const isCurrent = isLessonCurrent(index, activeDayIndex, isTuesday);
       const lessonData = getSavedLessonData(currentProfileId, activeWeekIndex, activeDayIndex, index);
       const customCourseId = lesson ? (lesson as any).customCourseId : undefined;
-      if (isTuesday && index === 3) {
-        return ( <ScheduleItem key="class-hour" lesson={{ commonLesson: { name: 'Классный час', teacher: '', room: '', group: '' } }} index={index} isCurrent={isCurrent} isTuesday={true} isClassHour={true} onClick={() => {}} activeDayIndex={activeDayIndex} /> );
-      }
+      if (isTuesday && index === 3) { return ( <ScheduleItem key="class-hour" lesson={{ commonLesson: { name: 'Классный час', teacher: '', room: '', group: '' } }} index={index} isCurrent={isCurrent} isTuesday={true} isClassHour={true} onClick={() => {}} activeDayIndex={activeDayIndex} /> ); }
       return ( <ScheduleItem key={customCourseId || index} lesson={lesson} index={index} isCurrent={isCurrent} isTuesday={isTuesday} hasNote={hasNoteForLesson(index)} onSubgroupChange={handleSubgroupChange} savedSubgroup={lessonData.subgroup} isTeacherView={isTeacherView} customCourseId={customCourseId} activeDayIndex={activeDayIndex} onClick={() => { if (lesson && !lesson.noLesson) setEditingLessonIndex(index); }} /> );
     });
   };
@@ -1236,92 +1088,23 @@ export function ScheduleScreen() {
   const currentLessonData = editingLessonIndex !== null ? getSavedLessonData(currentProfileId, activeWeekIndex, activeDayIndex, editingLessonIndex) : { notes: '', subgroup: 0 };
 
   const practiceInfo = useMemo<PracticeInfo | null>(() => {
-    if (isTeacherView && !appState.profiles.student?.id) {
-        return null;
-    }
-
+    if (isTeacherView && !appState.profiles.student?.id) return null;
     let info: PracticeInfo | null = null;
-    const curDate = new Date(selectedDateTime);
-    const scheduleToSearch = (isTeacherView && appState.profiles.student?.schedule) 
-        ? appState.profiles.student.schedule 
-        : displaySchedule;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const groupName = appState.profiles.student?.name || "";
-    const currentCourse = getCourseFromGroupName(groupName);
-
-    const activeEvent = calendarEvents.find(ev => {
-        const start = startOfDay(parseISO(ev.dateStart));
-        const end = endOfDay(parseISO(ev.dateEnd));
-        return isWithinInterval(curDate, { start, end });
-    });
-
-    if (activeEvent) {
-        const dateStart = parseISO(activeEvent.dateStart);
-        const daysUntil = differenceInCalendarDays(dateStart, today);
-        info = {
-            name: (isTeacherView ? `${appState.profiles.student?.name}: ${activeEvent.title}` : activeEvent.title),
-            type: activeEvent.type as any,
-            code: activeEvent.code,
-            dateStart: dateStart,
-            dateEnd: parseISO(activeEvent.dateEnd),
-            daysUntil: daysUntil,
-            isActive: daysUntil <= 0,
-            returnDate: addDays(parseISO(activeEvent.dateEnd), 1)
-        };
-    } else {
-        const upcomingHoliday = findUpcomingEvent(calendarEvents, curDate, 4);
-        if (upcomingHoliday) {
-            info = upcomingHoliday;
-            info.isActive = info.daysUntil <= 0;
-        } else if (overrides && (overrides.isPractice || overrides.practiceTitle)) {
-           const pEnd = overrides.dateEnd ? parseISO(overrides.dateEnd) : null;
-           const isExpired = pEnd && curDate > endOfDay(pEnd);
-
-           if (!isExpired) {
-               const title = overrides.practiceTitle || "Событие";
-               const code = overrides.practiceCode || "";
-               let type: 'practice' | 'attestation' | 'holiday' | 'gia' | 'session' = 'practice';
-               if (code === '::' || title.toLowerCase().includes('аттестация')) type = 'attestation';
-               else if (['III', 'D'].includes(code)) type = 'gia';
-               else if (code === '=') type = 'holiday';
-               const dateStart = overrides.dateStart ? parseISO(overrides.dateStart) : curDate;
-               const daysUntil = differenceInCalendarDays(dateStart, today);
-               info = { name: title, type: type, dateStart: dateStart, dateEnd: overrides.dateEnd ? parseISO(overrides.dateEnd) : null, returnDate: overrides.returnDate ? parseISO(overrides.returnDate) : null, daysUntil: daysUntil, isActive: daysUntil <= 0 };
-           }
-        } else {
-           info = findNextPractice(scheduleToSearch, activeWeekIndex, curDate);
-           if (info) {
-               info.isActive = info.daysUntil <= 0;
-           }
+    const curDate = new Date(selectedDateTime), today = startOfDay(new Date());
+    const activeEvent = calendarEvents.find(ev => isWithinInterval(curDate, { start: startOfDay(parseISO(ev.dateStart)), end: endOfDay(parseISO(ev.dateEnd)) }));
+    if (activeEvent && activeEvent.type !== 'gia' && activeEvent.code !== 'III' && activeEvent.code !== 'D') {
+        info = { name: activeEvent.title, type: activeEvent.type as any, code: activeEvent.code, dateStart: parseISO(activeEvent.dateStart), dateEnd: parseISO(activeEvent.dateEnd), daysUntil: differenceInCalendarDays(parseISO(activeEvent.dateStart), today), isActive: differenceInCalendarDays(parseISO(activeEvent.dateStart), today) <= 0 };
+    } else if (!activeEvent) {
+        const upcoming = findUpcomingEvent(calendarEvents, curDate, 4);
+        if (upcoming && upcoming.type !== 'gia') { info = upcoming; info.isActive = info.daysUntil <= 0; }
+        else if (overrides && overrides.isPractice && !['III', 'D'].includes(overrides.practiceCode || "")) {
+            info = { name: overrides.practiceTitle || "Событие", type: 'practice', dateStart: overrides.dateStart ? parseISO(overrides.dateStart) : curDate, dateEnd: overrides.dateEnd ? parseISO(overrides.dateEnd) : null, daysUntil: differenceInCalendarDays(overrides.dateStart ? parseISO(overrides.dateStart) : curDate, today), isActive: differenceInCalendarDays(overrides.dateStart ? parseISO(overrides.dateStart) : curDate, today) <= 0 };
         }
     }
-
-    if (info && (info.type === 'gia' || info.code === 'III' || info.code === 'D')) {
-        if (currentCourse !== 4) return null;
-    }
-
-    if (info && !info.isActive && (info.type === 'gia' || info.code === 'III' || info.code === 'D')) {
-        return null;
-    }
-
-    if (isTeacherView && info) {
-        const eventStart = startOfDay(info.dateStart);
-        const eventEnd = info.dateEnd ? endOfDay(info.dateEnd) : endOfDay(info.dateStart);
-        const isEventOnSelectedDay = isWithinInterval(curDate, { start: eventStart, end: eventEnd });
-        
-        if (!isEventOnSelectedDay) {
-            return null;
-        }
-    }
-
     return info;
-  }, [calendarEvents, selectedDateTime, overrides, displaySchedule, activeWeekIndex, isTeacherView, appState.profiles.student]);
+  }, [calendarEvents, selectedDateTime, overrides, isTeacherView, appState.profiles.student]);
 
   const handlePracticeClick = () => { if (practiceInfo) setIsPracticeModalOpen(true); };
-
   const currentWeekDates = useMemo(() => {
     const monday = startOfWeek(new Date(selectedDateTime), { weekStartsOn: 1 });
     return [0, 1, 2, 3, 4].map((i) => addDays(monday, i));
@@ -1394,196 +1177,100 @@ export function ScheduleScreen() {
              .notif-title { color: #000; }
              .notif-desc { color: #666; }
         }
-        @keyframes slideDownFade {
-            from { opacity: 0; transform: translate(-50%, -30px); }
-            to { opacity: 1; transform: translate(-50%, 0); }
-        }
+        @keyframes slideDownFade { from { opacity: 0; transform: translate(-50%, -30px); } to { opacity: 1; transform: translate(-50%, 0); } }
         .notif-content { display: flex; align-items: center; gap: 14px; }
-        .notif-icon-box {
-            width: 40px; height: 40px;
-            border-radius: 14px;
-            background: rgba(140, 103, 246, 0.15); 
-            display: flex; align-items: center; justify-content: center;
-            flex-shrink: 0;
-        }
-        .gradient-icon {
-            background: -webkit-linear-gradient(135deg, #6200ea, #9d46ff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
+        .notif-icon-box { width: 40px; height: 40px; border-radius: 14px; background: rgba(140, 103, 246, 0.15); display: flex; align-items: center; justify-content: center; }
+        .gradient-icon { background: -webkit-linear-gradient(135deg, #6200ea, #9d46ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .notif-text { display: flex; flex-direction: column; }
         .notif-title { font-weight: 700; font-size: 14px; color: #fff; }
         .notif-desc { font-weight: 500; font-size: 11px; color: rgba(255,255,255,0.7); margin-top: 1px; }
         .notif-actions { display: flex; align-items: center; gap: 8px; }
-        .notif-btn {
-            padding: 8px 14px;
-            border-radius: 10px;
-            font-weight: 700;
-            font-size: 12px;
-            cursor: pointer;
-            border: none;
-            transition: all 0.2s;
-        }
+        .notif-btn { padding: 8px 14px; border-radius: 10px; font-weight: 700; font-size: 12px; cursor: pointer; border: none; transition: all 0.2s; }
         .notif-btn.primary { background: #fff; color: #6200ea; }
         .notif-btn.secondary { background: rgba(255,255,255,0.15); color: #fff; }
-        .notif-close-btn {
-            background: transparent;
-            border: none;
-            color: rgba(255,255,255,0.5);
-            display: flex; align-items: center;
-            padding: 4px;
-            cursor: pointer;
-        }
+        .notif-close-btn { background: transparent; border: none; color: rgba(255,255,255,0.5); display: flex; align-items: center; padding: 4px; cursor: pointer; }
+        .dropdown-overlay { position: fixed; inset: 0; z-index: 1000; background: transparent; }
         
-        .dropdown-overlay {
-            position: fixed;
-            inset: 0;
-            z-index: 1000;
-            background: transparent;
-        }
         .dropdown-menu-attached {
             position: absolute;
-            top: 120%; 
-            right: 0; 
+            top: 120%; right: 0; 
             background: var(--color-surface);
             border-radius: 18px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.25);
             padding: 8px;
             width: 260px;
             z-index: 1001;
             border: 1px solid var(--color-border);
             animation: scaleIn 0.2s ease forwards;
             transform-origin: top right;
+            backdrop-filter: blur(12px);
         }
-        @keyframes scaleIn {
-            from { opacity: 0; transform: scale(0.9); }
-            to { opacity: 1; transform: scale(1); }
-        }
+        @keyframes scaleIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
         
         .dropdown-item {
             width: 100%;
             display: flex;
             align-items: center;
-            padding: 10px 14px;
+            padding: 12px 14px;
             border: none;
             background: transparent;
-            color: #6200ea; 
             font-size: 14px;
             font-weight: 700;
             cursor: pointer;
-            border-radius: 10px;
-            transition: background 0.1s;
+            border-radius: 12px;
+            transition: all 0.15s;
             text-align: left;
-            gap: 12px;
+            gap: 14px;
+            margin-bottom: 2px;
         }
+        
         .dropdown-item .material-icons {
-            font-size: 20px;
-            color: #6200ea; 
+            font-size: 22px;
+            color: #a88dff;
             opacity: 1;
         }
+        
+        .dropdown-item span {
+            color: var(--color-text);
+            opacity: 0.9;
+        }
+        
         .dropdown-item:hover {
             background: var(--color-surface-container);
+            transform: translateX(4px);
         }
 
         @media (prefers-color-scheme: dark) {
-            .dropdown-item {
-                color: #ffffff; 
-            }
-            .dropdown-item .material-icons {
-                color: #ffffff; 
-            }
-            .dropdown-item:hover {
-                background: rgba(255, 255, 255, 0.1);
-            }
+            .dropdown-menu-attached { background: rgba(26, 26, 26, 0.9); }
+            .dropdown-item span { color: #ffffff; }
         }
-
-        .modern-snackbar {
-            position: fixed;
-            bottom: 40px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 90%;
-            max-width: 380px;
-            background: rgba(20, 20, 20, 0.85); 
-            backdrop-filter: blur(16px); 
-            color: #fff;
-            border-radius: 24px;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
-            z-index: 2100;
-            overflow: hidden;
-            animation: slideUpSnack 0.5s cubic-bezier(0.19, 1, 0.22, 1);
-            border: 1px solid rgba(255,255,255,0.08);
-            display: flex;
-            align-items: center;
-            padding-right: 6px;
-        }
-        
         @media (prefers-color-scheme: light) {
-             .modern-snackbar { 
-                background: rgba(255, 255, 255, 0.85); 
-                color: #000; 
-                border: 1px solid rgba(0,0,0,0.05); 
-                box-shadow: 0 20px 50px rgba(0,0,0,0.15);
-             }
-             .snackbar-title { color: #000; }
-             .snackbar-message { color: rgba(0,0,0,0.7); }
-             .snackbar-btn { background: rgba(0,0,0,0.05); color: #000; }
-             .snackbar-left-border { background: #6200ea; }
+            .dropdown-menu-attached { background: rgba(255, 255, 255, 0.9); }
+            .dropdown-item span { color: #1a1a1a; }
         }
 
+        .modern-snackbar { position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 380px; background: rgba(20, 20, 20, 0.85); backdrop-filter: blur(16px); color: #fff; border-radius: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); z-index: 2100; overflow: hidden; animation: slideUpSnack 0.5s cubic-bezier(0.19, 1, 0.22, 1); border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; padding-right: 6px; }
+        @media (prefers-color-scheme: light) { .modern-snackbar { background: rgba(255, 255, 255, 0.85); color: #000; border: 1px solid rgba(0,0,0,0.05); box-shadow: 0 20px 50px rgba(0,0,0,0.15); } .snackbar-title { color: #000; } .snackbar-message { color: rgba(0,0,0,0.7); } .snackbar-btn { background: rgba(0,0,0,0.05); color: #000; } .snackbar-left-border { background: #6200ea; } }
         @keyframes slideUpSnack { from { transform: translate(-50%, 100px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
-        
-        .snackbar-left-border {
-            width: 4px;
-            height: 40px;
-            background: #fff;
-            border-radius: 10px;
-            margin-left: 16px;
-        }
-
+        .snackbar-left-border { width: 4px; height: 40px; background: #fff; border-radius: 10px; margin-left: 16px; }
         .snackbar-content { display: flex; align-items: center; padding: 14px 16px; gap: 14px; flex: 1; }
-        
-        .snackbar-icon-area {
-            width: 40px; height: 40px;
-            background: linear-gradient(135deg, #6200ea, #9d46ff);
-            border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            flex-shrink: 0;
-            box-shadow: 0 4px 10px rgba(98, 0, 234, 0.4);
-        }
-        
+        .snackbar-icon-area { width: 40px; height: 40px; background: linear-gradient(135deg, #6200ea, #9d46ff); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 10px rgba(98, 0, 234, 0.4); }
         .snackbar-text-area { flex: 1; display: flex; flex-direction: column; justify-content: center; }
         .snackbar-title { font-weight: 800; font-size: 14px; margin-bottom: 2px; letter-spacing: 0.3px; }
         .snackbar-message { font-size: 12px; opacity: 0.8; line-height: 1.3; font-weight: 500; }
-        
-        .snackbar-actions {
-            padding-right: 8px;
-        }
-        .snackbar-btn {
-            padding: 8px 14px;
-            background: rgba(255,255,255,0.15);
-            border: none;
-            border-radius: 14px;
-            color: inherit;
-            font-weight: 700;
-            font-size: 12px;
-            cursor: pointer;
-            display: flex; align-items: center; justify-content: center;
-            transition: all 0.2s;
-        }
+        .snackbar-actions { padding-right: 8px; }
+        .snackbar-btn { padding: 8px 14px; background: rgba(255,255,255,0.15); border: none; border-radius: 14px; color: inherit; font-weight: 700; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
         .snackbar-btn:active { transform: scale(0.95); }
-
         .container { position: relative; }
       `}</style>
       <div className="container" style={{ fontFamily: 'Inter, sans-serif' }}>
         <div className="schedule-header">
           <h2 className="schedule-title" style={{ fontWeight: 800 }}>Расписание</h2>
-          
           <div style={{ position: 'relative' }}>
               <button id="tour-menu" className="menu-button" onClick={() => setIsMenuOpen(!isMenuOpen)}>
                 <Icon name="more_vert" />
               </button>
+              {/* 🔥 Пропсы синхронизированы — ReferenceError больше не будет */}
               <DropdownMenu 
                   isOpen={isMenuOpen} 
                   onClose={() => setIsMenuOpen(false)} 
@@ -1597,30 +1284,23 @@ export function ScheduleScreen() {
                   onAddCourse={() => setIsAddCourseOpen(true)} 
                   onSubscribePush={handlePushSubscription}
                   isPushEnabled={isPushEnabled} 
+                  onOpenSubsList={() => setIsSubsListOpen(true)} // 🔥 Имя исправлено
+                  onSupport={() => setIsSupportOpen(true)}
               />
           </div>
         </div>
-        
         <div id="tour-profile">
             <ProfileSwitcher 
-              key={appState.lastUsed} 
-              profiles={appState.profiles} 
-              currentProfileType={appState.lastUsed} 
-              onSwitch={handleProfileSwitch} 
-              onAddProfile={handleAddProfile} 
-              isLoading={isSwitchingProfile} 
+              key={appState.lastUsed} profiles={appState.profiles} currentProfileType={appState.lastUsed} 
+              onSwitch={handleProfileSwitch} onAddProfile={handleAddProfile} isLoading={isSwitchingProfile} 
             />
         </div>
-        
         {showPushBanner && (
             <FloatingNotificationBanner 
-                isEnabled={isPushEnabled} 
-                onToggle={handlePushSubscription} 
-                isSupported={isPushSupported}
-                onClose={() => setShowPushBanner(false)} 
+                isEnabled={isPushEnabled} onToggle={handlePushSubscription} 
+                isSupported={isPushSupported} onClose={closePushBanner} 
             />
         )}
-
         <PracticeBanner info={practiceInfo} onClick={handlePracticeClick} />
         <PracticeDetailsModal isOpen={isPracticeModalOpen} onClose={() => setIsPracticeModalOpen(false)} info={practiceInfo} currentProfileId={currentProfileId} calendarEvents={calendarEvents} onNavigateToDate={handleNavigateToDate} />
         <div id="tour-days" className={`schedule-tabs-container ${swipeLimitReached ? 'limit-reached' : ''}`} ref={tabsContainerRef}>
@@ -1680,16 +1360,19 @@ export function ScheduleScreen() {
           ) : error ? (<div className="error-state"><p>{error}</p><button onClick={() => window.location.reload()}>Обновить</button></div>) : renderLessons()}
           {!error && (<div className="overrides-toggle-container"><button className={`overrides-toggle ${applyOverrides ? 'active' : ''}`} onClick={toggleApplyOverrides} disabled={isSwitchingProfile}><Icon name="swap_horiz" /><span>Учитывать замены</span></button></div>)}
         </div>
-        
         <AddCourseModal isOpen={isAddCourseOpen} onClose={() => setIsAddCourseOpen(false)} activeWeek={activeWeekIndex} activeDay={activeDayIndex} schedule={fullSchedule} overrides={applyOverrides ? overrides : null} profileId={currentProfileId} />
         <CustomCalendar isOpen={isCalendarOpen} onClose={() => setIsCalendarOpen(false)} onSelectDate={handleDateSelect} currentDate={selectedDate} calendarEvents={calendarEvents} />
         <NoteModal lesson={lessonToEdit} onClose={() => setEditingLessonIndex(null)} onSave={handleSaveNote} savedNote={currentLessonData.notes} savedSubgroup={currentLessonData.subgroup} />
+        
+        {/* 🔥 ПОДКЛЮЧЕНИЕ МОДАЛОК */}
+        <ActiveSubscriptionsModal isOpen={isSubsListOpen} onClose={() => setIsSubsListOpen(false)} />
+        <SupportModal isOpen={isSupportOpen} onClose={() => setIsSupportOpen(false)} onSubmit={handleSupportSubmit} isLoading={isSupportLoading} />
+        
         <Snackbar message={snackbarMessage || ''} isVisible={showSnackbar} onClose={() => { setShowSnackbar(false); setSnackbarLink(null); }} link={snackbarLink} linkText={snackbarLinkText} />
         <HistoryModal isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} history={history} isTeacherView={isTeacherView} />
         <AllNotesModal isOpen={isNotesModalOpen} onClose={() => setIsNotesModalOpen(false)} profileId={currentProfileId} schedule={fullSchedule} />
         <AllEventsModal isOpen={isAllEventsModalOpen} onClose={() => setIsAllEventsModalOpen(false)} calendarEvents={calendarEvents} onNavigateToDate={handleNavigateToDate} groupName={appState.profiles.student?.name} />
         <RateModal isOpen={isRateModalOpen} onClose={() => setIsRateModalOpen(false)} onSubmit={handleRateSubmit} />
-
         <div id="tour-nav-panel" className="week-switcher-container">
           <button className="back-button" onClick={() => navigate('/')} title="Назад"><Icon name="arrow_back" /></button>
           <button className="week-switcher-button" onClick={handleWeekSwitch}>

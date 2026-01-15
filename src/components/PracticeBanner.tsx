@@ -20,7 +20,7 @@ export const PracticeBanner: React.FC<PracticeBannerProps> = ({ info, onClick })
     if (c === '8') return { accent: '#ffff00', icon: 'engineering', label: 'Производственная практика' }; 
     if (c === 'X' || c === 'Х') return { accent: '#ffc000', icon: 'work_history', label: 'Преддипломная практика' }; 
     if (c === '=') return { accent: '#00b0f0', icon: 'beach_access', label: 'Каникулы' }; 
-    if (c === 'ОВС') return { accent: '#ff6600', icon: 'military_tech', label: 'Учебные сборы по ОВС' }; // 🔥 Добавлено ОВС
+    if (c === 'ОВС') return { accent: '#ff6600', icon: 'military_tech', label: 'Учебные сборы по ОВС' }; 
     if (c === 'III') return { accent: '#7030a0', icon: 'workspace_premium', label: 'ГИА' }; 
     if (c === 'D' || c === 'Д') return { accent: '#e6b8af', icon: 'history_edu', label: 'Подготовка к ГИА' }; 
     
@@ -93,26 +93,15 @@ export const PracticeBanner: React.FC<PracticeBannerProps> = ({ info, onClick })
         }
 
         .practice-banner-container:active { transform: scale(0.98); background-color: var(--color-surface-variant); }
-
         .accent-bar { position: absolute; left: 0; top: 0; bottom: 0; width: 5px; }
-
         .content-wrapper { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
-
         .icon-box { 
             min-width: 40px; width: 40px; height: 40px; border-radius: 10px; 
             display: flex; align-items: center; justify-content: center; 
             flex-shrink: 0;
         }
-        
         .banner-icon-span { font-size: 22px; }
-
-        .text-content { 
-            display: flex; flex-direction: column; 
-            justify-content: center; 
-            min-width: 0;
-            flex: 1;
-        }
-
+        .text-content { display: flex; flex-direction: column; justify-content: center; min-width: 0; flex: 1; }
         .banner-title { 
             color: var(--color-text);
             font-weight: 700; 
@@ -123,7 +112,6 @@ export const PracticeBanner: React.FC<PracticeBannerProps> = ({ info, onClick })
             text-overflow: ellipsis;
             margin-bottom: 2px;
         }
-
         .banner-dates { 
             color: var(--color-text);
             opacity: 0.6;
@@ -133,9 +121,7 @@ export const PracticeBanner: React.FC<PracticeBannerProps> = ({ info, onClick })
             overflow: hidden;
             text-overflow: ellipsis;
         }
-
         .arrow-icon { color: var(--color-text); opacity: 0.3; font-size: 20px; flex-shrink: 0; }
-
         @media (max-width: 380px) {
             .practice-banner-container { padding: 10px 12px; }
             .icon-box { min-width: 36px; width: 36px; height: 36px; }
