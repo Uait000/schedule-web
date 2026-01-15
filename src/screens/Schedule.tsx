@@ -31,6 +31,18 @@ interface LessonData {
 
 const DAYS_OF_WEEK = [ 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница' ];
 
+// 🔥 ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ VAPID КЛЮЧА
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
 function getCourseFromGroupName(groupName: string): number | null {
   if (!groupName) return null;
   const match = groupName.match(/-(\d)/);
@@ -40,11 +52,11 @@ function getCourseFromGroupName(groupName: string): number | null {
 function groupSubgroups(lessons: any[], isTeacherView: boolean): any[] {
   if (!lessons || !Array.isArray(lessons)) return lessons;
   if (isTeacherView) return lessons;
-  
+   
   const groupedLessons = [];
   const subgroupMap = new Map();
   const teacherSubgroupMap = new Map();
-  
+   
   for (let i = 0; i < lessons.length; i++) {
     const lesson = lessons[i];
     if (lesson && lesson.subgroupedLesson) {
@@ -52,7 +64,7 @@ function groupSubgroups(lessons: any[], isTeacherView: boolean): any[] {
     } else if (lesson && lesson.commonLesson && lesson.commonLesson.teacher) {
       const lessonName = lesson.commonLesson.name;
       const teacher = lesson.commonLesson.teacher;
-      
+       
       if (!subgroupMap.has(lessonName)) {
         subgroupMap.set(lessonName, {
           subgroupedLesson: {
@@ -61,7 +73,7 @@ function groupSubgroups(lessons: any[], isTeacherView: boolean): any[] {
           }
         });
       }
-      
+       
       const groupedLesson = subgroupMap.get(lessonName);
       let subgroupIndex = 1;
       const teacherKey = `${lessonName}_${teacher}`;
@@ -72,11 +84,11 @@ function groupSubgroups(lessons: any[], isTeacherView: boolean): any[] {
         subgroupIndex = existingSubgroups + 1;
         teacherSubgroupMap.set(teacherKey, subgroupIndex);
       }
-      
+       
       const existingSubgroup = groupedLesson.subgroupedLesson.subgroups.find(
         (sub: any) => sub.subgroup_index === subgroupIndex
       );
-      
+       
       if (!existingSubgroup) {
         groupedLesson.subgroupedLesson.subgroups.push({
           teacher: teacher,
@@ -89,7 +101,7 @@ function groupSubgroups(lessons: any[], isTeacherView: boolean): any[] {
       groupedLessons.push(lesson);
     }
   }
-  
+   
   subgroupMap.forEach((groupedLesson, lessonName) => {
     if (groupedLesson.subgroupedLesson.subgroups.length > 1) {
       const firstIndex = lessons.findIndex(lesson => 
@@ -159,7 +171,7 @@ export function normalizeLesson(lesson: any): Lesson {
       }
     };
   }
-  
+   
   if (lesson.name || lesson.teacher || lesson.room) {
     if (lesson.subgroup_index !== undefined) {
       return {
@@ -183,7 +195,7 @@ export function normalizeLesson(lesson: any): Lesson {
       }
     };
   }
-  
+   
   return { noLesson: {} };
 }
 
@@ -202,25 +214,52 @@ function saveLessonData(profileId: string, week: number, day: number, lesson: nu
   localStorage.setItem(key, JSON.stringify(data));
 }
 
-const Icon = ({ name, style = {} }: { name: string; style?: React.CSSProperties }) => (
-  <span className="material-icons" style={{ fontSize: 'inherit', verticalAlign: 'middle', ...style }}>{name}</span>
+const Icon = ({ name, style = {}, className = '' }: { name: string; style?: React.CSSProperties, className?: string }) => (
+  <span className={`material-icons ${className}`} style={{ fontSize: 'inherit', verticalAlign: 'middle', ...style }}>{name}</span>
 );
 
 // --- Sub-components (Calendar, Menu, Snackbar) ---
+
+// 🔥 ОБНОВЛЕННЫЙ БАННЕР: ГРАДИЕНТНАЯ ИКОНКА + КРАСИВЫЙ СТИЛЬ
+function FloatingNotificationBanner({ isEnabled, onToggle, isSupported, onClose }: { isEnabled: boolean; onToggle: () => void; isSupported: boolean; onClose: () => void }) {
+    if (!isSupported) return null;
+    
+    return (
+        <div className="floating-notification-banner">
+            <div className="notif-content">
+                <div className="notif-icon-box">
+                    <Icon name={isEnabled ? "notifications_active" : "notifications_off"} className="gradient-icon" style={{ fontSize: '26px' }} />
+                </div>
+                <div className="notif-text">
+                    <span className="notif-title">{isEnabled ? 'Уведомления активны' : 'Включить уведомления?'}</span>
+                    <span className="notif-desc">{isEnabled ? 'Вы получаете оповещения о заменах' : 'Не пропускайте важные изменения'}</span>
+                </div>
+            </div>
+            <div className="notif-actions">
+                <button className={`notif-btn ${isEnabled ? 'secondary' : 'primary'}`} onClick={onToggle}>
+                    {isEnabled ? 'Выкл' : 'Вкл'}
+                </button>
+                <button className="notif-close-btn" onClick={onClose}>
+                    <Icon name="close" />
+                </button>
+            </div>
+        </div>
+    );
+}
 
 function CustomCalendar({ isOpen, onClose, onSelectDate, currentDate, calendarEvents }: { isOpen: boolean; onClose: () => void; onSelectDate: (date: Date) => void; currentDate: Date; calendarEvents: CalendarEvent[]; }) { 
   const [viewDate, setViewDate] = useState(currentDate); 
   const [dateInput, setDateInput] = useState(format(currentDate, 'dd.MM.yyyy')); 
   const [isValid, setIsValid] = useState(true); 
-  
+   
   if (!isOpen) return null; 
-  
+   
   const monthStart = startOfMonth(viewDate); 
   const monthEnd = endOfMonth(viewDate); 
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd }); 
   const firstDayOfMonth = getDay(monthStart); 
   const startPadding = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1; 
-  
+   
   const isDateHoliday = (date: Date) => {
     return calendarEvents.some(event => {
       if (event.type !== 'holiday') return false;
@@ -238,7 +277,7 @@ function CustomCalendar({ isOpen, onClose, onSelectDate, currentDate, calendarEv
     setDateInput(format(date, 'dd.MM.yyyy')); 
     onClose(); 
   }; 
-  
+   
   const handleTodayClick = () => { 
     const today = new Date(); 
     setViewDate(today); 
@@ -246,7 +285,7 @@ function CustomCalendar({ isOpen, onClose, onSelectDate, currentDate, calendarEv
     onSelectDate(today); 
     onClose(); 
   }; 
-  
+   
   const handleDateInputChange = (event: React.ChangeEvent<HTMLInputElement>) => { 
     const value = event.target.value; 
     let formattedValue = value.replace(/\D/g, ''); 
@@ -273,7 +312,7 @@ function CustomCalendar({ isOpen, onClose, onSelectDate, currentDate, calendarEv
       } else { setIsValid(false); } 
     } else { setIsValid(true); } 
   }; 
-  
+   
   const handleKeyDown = (event: React.KeyboardEvent) => { 
     if (event.key === 'Enter' && isValid && dateInput.length === 10) { 
       const dateParts = dateInput.split('.'); 
@@ -288,7 +327,7 @@ function CustomCalendar({ isOpen, onClose, onSelectDate, currentDate, calendarEv
       } 
     } 
   }; 
-  
+   
   return ( 
     <div className="calendar-backdrop" onClick={onClose}> 
       <div className="calendar-modal-modern" onClick={(e) => e.stopPropagation()}> 
@@ -297,7 +336,7 @@ function CustomCalendar({ isOpen, onClose, onSelectDate, currentDate, calendarEv
           <span className="calendar-month-year">{format(viewDate, 'LLLL yyyy', { locale: ru })}</span> 
           <button onClick={() => setViewDate(addMonths(viewDate, 1))} className="calendar-nav-btn"><Icon name="chevron_right" /></button> 
         </div> 
-        
+          
         <div className="calendar-input-section"> 
           <div className="input-modern-wrapper">
              <Icon name="edit_calendar" style={{ opacity: 0.5, marginRight: '8px' }} />
@@ -324,7 +363,7 @@ function CustomCalendar({ isOpen, onClose, onSelectDate, currentDate, calendarEv
             const isDisabled = dayOfWeek === 0 || dayOfWeek === 6 || isHoliday;
             const isSelected = isSameDay(day, currentDate);
             const isToday = isSameDay(day, new Date());
-            
+             
             return ( 
               <button 
                 key={day.toString()} 
@@ -348,6 +387,7 @@ function CustomCalendar({ isOpen, onClose, onSelectDate, currentDate, calendarEv
   ); 
 }
 
+// 🔥 МЕНЮ
 function DropdownMenu({ 
   isOpen, 
   onClose, 
@@ -358,7 +398,9 @@ function DropdownMenu({
   onInstallApp,
   onOpenAllEvents,
   onStartTour,
-  onRateApp 
+  onRateApp,
+  onSubscribePush,
+  isPushEnabled 
 }: { 
   isOpen: boolean; 
   onClose: () => void; 
@@ -370,14 +412,16 @@ function DropdownMenu({
   onOpenAllEvents: () => void;
   onStartTour: () => void;
   onRateApp: () => void; 
+  onSubscribePush: () => void;
+  isPushEnabled: boolean; 
 }) { 
   const navigate = useNavigate(); 
-  
+   
   if (!isOpen) return null; 
-  
+   
   const handleMenuClick = (action: string) => { 
     if (action !== 'help' && action !== 'install') onClose();
-    
+     
     if (action === 'overrides') { onCheckOverrides(); } 
     else if (action === 'history') { onOpenHistory(); } 
     else if (action === 'addCourse') { onAddCourse(); } 
@@ -385,6 +429,7 @@ function DropdownMenu({
     else if (action === 'install') { onInstallApp(); } 
     else if (action === 'allEvents') { onOpenAllEvents(); }
     else if (action === 'rate') { onRateApp(); } 
+    else if (action === 'push') { onSubscribePush(); } 
     else if (action === 'changeGroup') { 
       localStorage.removeItem('selectedId'); 
       localStorage.removeItem('userType'); 
@@ -392,22 +437,29 @@ function DropdownMenu({
     } else if (action === 'feedback') { window.open('https://t.me/ttgt1bot', '_blank'); } 
     else if (action === 'help') { onStartTour(); } 
   }; 
-  
+   
   return ( 
-    <div className="dropdown-backdrop" onClick={onClose}> 
-      <div className="dropdown-menu" onClick={(e) => e.stopPropagation()}> 
-        <button id="menu-item-overrides" className="dropdown-item" onClick={() => handleMenuClick('overrides')}><Icon name="sync_alt" /><span>Проверить изменения</span></button> 
-        <button id="menu-item-all-events" className="dropdown-item" onClick={() => handleMenuClick('allEvents')} style={{ color: 'var(--color-primary)', fontWeight: '700' }}><Icon name="event_repeat" /><span>График событий</span></button> 
-        <button id="menu-item-history" className="dropdown-item" onClick={() => handleMenuClick('history')}><Icon name="history" /><span>История замен</span></button> 
-        <button id="menu-item-notes" className="dropdown-item" onClick={() => handleMenuClick('notes')}><Icon name="description" /><span>Мои заметки</span></button> 
-        <button id="menu-item-add-course" className="dropdown-item" onClick={() => handleMenuClick('addCourse')}><Icon name="add_circle" /><span>Добавить курс</span></button> 
-        <button id="menu-item-install" className="dropdown-item" onClick={() => handleMenuClick('install')} style={{ color: 'var(--color-primary)', fontWeight: '600' }}><Icon name="download" /><span>Установить приложение</span></button> 
-        <button id="menu-item-rate" className="dropdown-item" onClick={() => handleMenuClick('rate')}><Icon name="star_outline" /><span>Оценить приложение</span></button> 
-        <button id="menu-item-change-group" className="dropdown-item" onClick={() => handleMenuClick('changeGroup')}><Icon name="group" /><span>Поменять группу</span></button> 
-        <button id="menu-item-help" className="dropdown-item" onClick={() => handleMenuClick('help')}><Icon name="help_outline" /><span>Как пользоваться?</span></button>
-        <button id="menu-item-feedback" className="dropdown-item" onClick={() => handleMenuClick('feedback')}><Icon name="feedback" /><span>Обратная связь</span></button> 
-      </div> 
-    </div> 
+    <>
+        <div className="dropdown-overlay" onClick={onClose} />
+        <div className="dropdown-menu-attached" onClick={(e) => e.stopPropagation()}> 
+            <button id="menu-item-overrides" className="dropdown-item" onClick={() => handleMenuClick('overrides')}><Icon name="sync_alt" /><span>Проверить изменения</span></button> 
+            <button id="menu-item-all-events" className="dropdown-item" onClick={() => handleMenuClick('allEvents')}><Icon name="event_repeat" /><span>График событий</span></button> 
+            <button id="menu-item-history" className="dropdown-item" onClick={() => handleMenuClick('history')}><Icon name="history" /><span>История замен</span></button> 
+            <button id="menu-item-notes" className="dropdown-item" onClick={() => handleMenuClick('notes')}><Icon name="description" /><span>Мои заметки</span></button> 
+            
+            <button id="menu-item-push" className="dropdown-item" onClick={() => handleMenuClick('push')}>
+                <Icon name={isPushEnabled ? "notifications_active" : "notifications_off"} />
+                <span>{isPushEnabled ? 'Выключить уведомления' : 'Включить уведомления'}</span>
+            </button>
+
+            <button id="menu-item-add-course" className="dropdown-item" onClick={() => handleMenuClick('addCourse')}><Icon name="add_circle" /><span>Добавить курс</span></button> 
+            <button id="menu-item-install" className="dropdown-item" onClick={() => handleMenuClick('install')}><Icon name="download" /><span>Установить приложение</span></button> 
+            <button id="menu-item-rate" className="dropdown-item" onClick={() => handleMenuClick('rate')}><Icon name="star_outline" /><span>Оценить приложение</span></button> 
+            <button id="menu-item-change-group" className="dropdown-item" onClick={() => handleMenuClick('changeGroup')}><Icon name="group" /><span>Поменять группу</span></button> 
+            <button id="menu-item-help" className="dropdown-item" onClick={() => handleMenuClick('help')}><Icon name="help_outline" /><span>Как пользоваться?</span></button>
+            <button id="menu-item-feedback" className="dropdown-item" onClick={() => handleMenuClick('feedback')}><Icon name="feedback" /><span>Обратная связь</span></button> 
+        </div> 
+    </>
   ); 
 }
 
@@ -422,13 +474,13 @@ function processSubgroupedOverride(originalLesson: Lesson, overrideWillBe: Lesso
 
   const originalSubgroups = originalLesson.subgroupedLesson.subgroups || [];
   const overrideSubgroups = overrideWillBe.subgroupedLesson.subgroups || [];
-  
+   
   const originalSubgroupsMap = new Map();
   originalSubgroups.forEach(sub => {
     const key = sub.subgroup_index || 0;
     originalSubgroupsMap.set(key, { ...sub });
   });
-  
+   
   overrideSubgroups.forEach(overrideSub => {
     const key = overrideSub.subgroup_index || 0;
     const isCancelled = (
@@ -436,19 +488,19 @@ function processSubgroupedOverride(originalLesson: Lesson, overrideWillBe: Lesso
       (overrideSub.room === 'нет' || !overrideSub.room || overrideSub.room === 'null') ||
       (overrideSub.group === 'нет' || !overrideSub.group || overrideSub.group === 'null')
     );
-    
+     
     if (isCancelled) {
       originalSubgroupsMap.delete(key);
     } else {
       originalSubgroupsMap.set(key, overrideSub);
     }
   });
-  
+   
   if (originalSubgroupsMap.size === 0) return { noLesson: {} };
-  
+   
   const sortedSubgroups = Array.from(originalSubgroupsMap.values())
     .sort((a, b) => (a.subgroup_index || 0) - (b.subgroup_index || 0));
-  
+   
   return {
     subgroupedLesson: {
       name: originalName,
@@ -457,6 +509,7 @@ function processSubgroupedOverride(originalLesson: Lesson, overrideWillBe: Lesso
   };
 }
 
+// 🔥 КРАСИВЫЙ SNACKBAR
 function Snackbar({ message, isVisible, onClose, link, linkText }: { message: string; isVisible: boolean; onClose: () => void; link?: string | null; linkText?: string; }) { 
   useEffect(() => { 
     if (isVisible) { 
@@ -464,66 +517,35 @@ function Snackbar({ message, isVisible, onClose, link, linkText }: { message: st
       return () => clearTimeout(timer); 
     } 
   }, [isVisible, onClose]); 
-  
+   
   if (!isVisible) return null; 
-  
+   
   const handleLinkClick = (e: React.MouseEvent) => { 
     e.stopPropagation(); 
     if (link) { window.open(link, '_blank'); } 
     onClose(); 
   };
   const handleContainerClick = () => { onClose(); };
-  
+   
   return ( 
     <div 
-      style={{ 
-        position: 'fixed', 
-        bottom: '100px', 
-        left: '50%', 
-        transform: 'translateX(-50%)', 
-        backgroundColor: 'var(--color-surface)', 
-        color: 'var(--color-text)', 
-        padding: '0', 
-        borderRadius: '16px', 
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)', 
-        zIndex: 2000, 
-        maxWidth: '320px', 
-        width: '90%', 
-        animation: 'fadeIn 0.3s ease', 
-        border: '1px solid var(--color-border)', 
-        overflow: 'hidden' 
-      }} 
+      className="modern-snackbar"
       onClick={handleContainerClick}
     > 
-      <div style={{ padding: '16px 20px', borderBottom: link ? '1px solid var(--color-border)' : 'none' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '4px' }}>
-          <Icon name="info" style={{ fontSize: '20px', color: 'var(--color-primary)', marginRight: '8px' }} />
-          <span style={{ fontWeight: '600', fontSize: '16px' }}>Обновление</span>
+      <div className="snackbar-left-border"></div>
+      <div className="snackbar-content">
+        <div className="snackbar-icon-area">
+          <Icon name="cloud_sync" style={{ fontSize: '22px', color: '#fff' }} />
         </div>
-        <div style={{ textAlign: 'center', fontSize: '14px', lineHeight: '1.4' }}>{message}</div>
+        <div className="snackbar-text-area">
+            <div className="snackbar-title">Обновление</div>
+            <div className="snackbar-message">{message}</div>
+        </div>
       </div>
       {link && (
-        <div style={{ padding: '12px 20px' }}>
-          <button 
-            onClick={handleLinkClick} 
-            style={{ 
-              backgroundColor: 'var(--color-primary)', 
-              color: 'white', 
-              border: 'none', 
-              borderRadius: '10px', 
-              padding: '10px 16px', 
-              fontSize: '14px', 
-              fontWeight: '600', 
-              cursor: 'pointer', 
-              width: '100%', 
-              transition: 'all 0.2s ease', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center' 
-            }}
-          >
-            <Icon name="open_in_new" style={{ fontSize: '18px', marginRight: '8px' }} />
-            {linkText || 'Посмотреть на сайте'}
+        <div className="snackbar-actions">
+          <button onClick={handleLinkClick} className="snackbar-btn">
+            {linkText || 'Перейти'} <Icon name="arrow_forward" style={{ fontSize: '16px', marginLeft: '6px' }} />
           </button>
         </div>
       )}
@@ -538,15 +560,15 @@ export function ScheduleScreen() {
   const scheduleListRef = useRef<HTMLDivElement>(null);
   const tabsContainerRef = useRef<HTMLDivElement>(null);
   const tabsRef = useRef<HTMLDivElement>(null);
-  
+   
   const { activeDayIndex, setActiveDayIndex, activeWeekIndex, setActiveWeekIndex, applyOverrides, setApplyOverrides, selectedDate, setSelectedDate, resetToToday } = useScheduleState();
-  
+   
   const [appState, setAppState] = useState(() => dataStore.getState());
   const [fullSchedule, setFullSchedule] = useState<Schedule | null>(null);
   const [displaySchedule, setDisplaySchedule] = useState<Schedule | null>(null);
   const [overrides, setOverrides] = useState<OverridesResponse | null>(null);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
-  
+   
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingLessonIndex, setEditingLessonIndex] = useState<number | null>(null);
@@ -565,9 +587,14 @@ export function ScheduleScreen() {
   const [isAllEventsModalOpen, setIsAllEventsModalOpen] = useState(false); 
   const [isRateModalOpen, setIsRateModalOpen] = useState(false); 
   
+  // 🔥 НОВОЕ СОСТОЯНИЕ ДЛЯ PUSH и БАННЕРА
+  const [isPushEnabled, setIsPushEnabled] = useState(false);
+  const [isPushSupported, setIsPushSupported] = useState(true);
+  const [showPushBanner, setShowPushBanner] = useState(false); 
+
   const currentProfileId = localStorage.getItem('selectedId') || 'default';
   const isTeacherView = appState.lastUsed === ProfileType.TEACHER; 
-  
+   
   const { history, addEntry } = useHistoryStorage(currentProfileId);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
@@ -576,11 +603,107 @@ export function ScheduleScreen() {
 
   const lastFetchRef = useRef<string>("");
 
+  // 🔥 МАЯК ДЛЯ ПРЕДОТВРАЩЕНИЯ БАННЕРА ПРИ ЗАХОДЕ
+  const isFirstRender = useRef(true);
+
   const showMessage = useCallback((message: string) => { 
     setSnackbarMessage(message); 
     setSnackbarLink(null); 
     setShowSnackbar(true); 
   }, []);
+
+  // 🔥 ОБНОВЛЕННАЯ ПРОВЕРКА PUSH ПРИ ЗАГРУЗКЕ (С исправлениями)
+  useEffect(() => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        setIsPushSupported(false);
+        return;
+    }
+    
+    const checkSubscriptionStatus = async () => {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        
+        // Проверяем статус в localStorage именно для текущего профиля
+        const isProfilePushActive = localStorage.getItem(`push_active_${currentProfileId}`) === 'true';
+        
+        if (subscription && isProfilePushActive) {
+            setIsPushEnabled(true);
+        } else {
+            setIsPushEnabled(false);
+            // 🔥 ИСПРАВЛЕНИЕ: Показываем баннер ТОЛЬКО если это не первый рендер (т.е. произошло переключение)
+            if (!isProfilePushActive && !isFirstRender.current) {
+                setTimeout(() => setShowPushBanner(true), 1500);
+            }
+        }
+        // После первой проверки устанавливаем флаг в false
+        isFirstRender.current = false;
+    };
+
+    checkSubscriptionStatus();
+  }, [currentProfileId]);
+
+  // 🔥 ИСПРАВЛЕННАЯ ЛОГИКА PUSH (РЕШЕНИЕ AbortError + Профилезависимость)
+  const handlePushSubscription = async () => {
+    if (!isPushSupported) {
+      showMessage("Браузер не поддерживает уведомления");
+      return;
+    }
+
+    setShowPushBanner(false);
+
+    if (isPushEnabled) {
+        // Логика отключения для конкретного профиля
+        setIsPushEnabled(false);
+        localStorage.setItem(`push_active_${currentProfileId}`, 'false');
+        // Опционально: уведомляем бэкенд об отключении именно для этого профиля
+        try {
+            const registration = await navigator.serviceWorker.ready;
+            const subscription = await registration.pushManager.getSubscription();
+            if (subscription) {
+                // Вызываем API с флагом удаления или специальным методом
+                await scheduleApi.subscribePush(subscription, currentProfileId, false);
+            }
+        } catch (e) { console.error(e); }
+        
+        showMessage("Уведомления профиля отключены");
+        return;
+    }
+
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const permission = await Notification.requestPermission();
+      
+      if (permission !== 'granted') {
+        showMessage("Разрешите уведомления в настройках");
+        return;
+      }
+
+      // 🔥 ПРОВЕРЯЕМ СУЩЕСТВУЮЩУЮ ПОДПИСКУ ДЛЯ ИЗБЕЖАНИЯ AbortError
+      let subscription = await registration.pushManager.getSubscription();
+
+      if (!subscription) {
+          const VAPID_PUBLIC_KEY = 'BIqO4RMd3S60fnef-Qx8ukxxZqTEsCyG-tvcvZAwyGef77_Nv0s56oxmuxSenjMH7nUsPoWb7xC7vyHVpWLZNPs';
+          subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+          });
+      }
+
+      // Отправляем на бэкенд подписку + ID ТЕКУЩЕГО профиля
+      await scheduleApi.subscribePush(subscription, currentProfileId, true);
+      
+      localStorage.setItem(`push_active_${currentProfileId}`, 'true');
+      setIsPushEnabled(true);
+      showMessage("Уведомления включены для этого профиля! 🔔");
+    } catch (err) {
+      console.error('Push registration failed:', err);
+      if (err instanceof Error && err.name === 'AbortError') {
+          showMessage("Ошибка: Обновите страницу и попробуйте снова"); 
+      } else {
+          showMessage("Ошибка при активации уведомлений");
+      }
+    }
+  };
 
   const handleNavigateToDate = useCallback((date: Date, message: string) => {
     setSelectedDate(date);
@@ -594,17 +717,17 @@ export function ScheduleScreen() {
 
   const loadProfileData = useCallback(async (profileId: string, profileType: ProfileType, date: Date = new Date()) => {
     if (!profileId) return;
-    
+     
     const formattedDate = format(date, 'yyyy-MM-dd');
     const metadata = dataStore.getProfileMetadata(profileId);
-    
+     
     const currentFetchKey = `${profileId}_${formattedDate}_${metadata.scheduleUpdate}_${metadata.eventsHash}`;
-    
+     
     if (lastFetchRef.current === currentFetchKey) return;
     lastFetchRef.current = currentFetchKey;
 
     const cachedProfile = dataStore.getState().profiles[profileType === ProfileType.TEACHER ? 'teacher' : 'student'];
-    
+     
     if (cachedProfile?.schedule) {
         setFullSchedule(cachedProfile.schedule);
         setOverrides(cachedProfile.overrides || null);
@@ -703,7 +826,7 @@ export function ScheduleScreen() {
   const handleProfileSwitch = useCallback(async (newType: ProfileType, newProfile: any) => {
     if (isSwitchingProfile) return;
     setIsSwitchingProfile(true);
-    
+     
     if (newProfile.schedule) {
         setFullSchedule(newProfile.schedule);
         setOverrides(newProfile.overrides || null);
@@ -715,6 +838,17 @@ export function ScheduleScreen() {
       await dataStore.setLastUsed(newType);
       localStorage.setItem('selectedId', newProfile.id);
       localStorage.setItem('userType', newType);
+      
+      // 🔥 ОБНОВЛЯЕМ СОСТОЯНИЕ PUSH ДЛЯ НОВОГО ПРОФИЛЯ
+      const isProfilePushActive = localStorage.getItem(`push_active_${newProfile.id}`) === 'true';
+      setIsPushEnabled(isProfilePushActive);
+      
+      // Сбрасываем флаг рендера при ручном переключении, чтобы useEffect мог показать баннер
+      isFirstRender.current = false;
+      
+      if (!isProfilePushActive) setShowPushBanner(true);
+      else setShowPushBanner(false);
+
       window.dispatchEvent(new Event('profileChanged'));
       lastFetchRef.current = ""; 
       await loadProfileData(newProfile.id, newType, selectedDate);
@@ -738,7 +872,7 @@ export function ScheduleScreen() {
       };
 
       await scheduleApi.postRate(payload);
-      
+       
       localStorage.setItem('app_rated', 'true'); 
       setIsRateModalOpen(false);
       showMessage("Спасибо за оценку! ❤️");
@@ -827,7 +961,7 @@ export function ScheduleScreen() {
 
   const handleTouchStart = (e: React.TouchEvent) => { setTouchStart(e.targetTouches[0].clientX); setSwipeLimitReached(false); };
   const handleTouchMove = (e: React.TouchEvent) => { setTouchEnd(e.targetTouches[0].clientX); };
-  
+   
   const handleTouchEnd = useCallback(() => {
     if (!touchStart || !touchEnd || isAnimating) return;
     const distance = touchStart - touchEnd;
@@ -864,11 +998,11 @@ export function ScheduleScreen() {
   };
 
   const handleWeekSwitch = () => {
-     const nextWeek = activeWeekIndex === 0 ? 1 : 0;
-     setActiveWeekIndex(nextWeek);
-     setSelectedDate(addDays(selectedDate, activeWeekIndex === 0 ? 7 : -7));
+      const nextWeek = activeWeekIndex === 0 ? 1 : 0;
+      setActiveWeekIndex(nextWeek);
+      setSelectedDate(addDays(selectedDate, activeWeekIndex === 0 ? 7 : -7));
   };
-  
+   
   const handleDateSelect = useCallback((date: Date) => { 
       setSelectedDate(date);
       setActiveWeekIndex(getWeekNumber(date));
@@ -939,9 +1073,9 @@ export function ScheduleScreen() {
     const newSchedule = JSON.parse(JSON.stringify(fullSchedule)) as Schedule;
     const currentWeekData = newSchedule.weeks?.[activeWeekIndex % 2];
     if (!currentWeekData) { setDisplaySchedule(newSchedule); return; }
-    
+     
     const curDate = new Date(selectedDateTime);
-    
+     
     const blockingEvent = calendarEvents.find(event => {
         if (event.type === 'attestation' || event.type === 'holiday') return false; 
         const start = startOfDay(parseISO(event.dateStart));
@@ -961,9 +1095,7 @@ export function ScheduleScreen() {
     }
 
     if (!applyOverrides) { setDisplaySchedule(newSchedule); return; }
-    
-    // 🔥 ГЛОБАЛЬНОЕ ИСПРАВЛЕНИЕ ДЛЯ ПРЕПОДАВАТЕЛЯ:
-    // Подготовка списка замен с учетом данных из профиля студента, если в профиле учителя пусто.
+     
     let effectiveOverrides: any[] = [];
     let substitutesDateMatches = false;
 
@@ -974,7 +1106,6 @@ export function ScheduleScreen() {
                                 overrides.year === curDate.getFullYear();
     }
 
-    // Если мы в режиме учителя и имеем данные студента, ищем замену там
     if (isTeacherView && appState.profiles.student) {
         const studentProfile = appState.profiles.student;
         const stOverrides = studentProfile.overrides;
@@ -985,7 +1116,7 @@ export function ScheduleScreen() {
                                   stOverrides.year === curDate.getFullYear();
             
             if (stDateMatches && stOverrides.overrides) {
-                substitutesDateMatches = true; // Активируем применение замен
+                substitutesDateMatches = true;
                 const teacherName = appState.profiles.teacher?.name || "";
                 const teacherLastName = teacherName.split(' ')[0];
 
@@ -996,11 +1127,10 @@ export function ScheduleScreen() {
                     if (willBe.commonLesson?.teacher?.includes(teacherLastName)) isRelevantToMe = true;
                     if (willBe.subgroupedLesson?.subgroups.some((s: any) => s.teacher?.includes(teacherLastName))) isRelevantToMe = true;
 
-                    // Если нашли замену с нашим именем, которой еще нет в нашем списке - добавляем
                     if (isRelevantToMe && !effectiveOverrides.some(o => o.index === stOv.index)) {
                         const enrichedWillBe = JSON.parse(JSON.stringify(willBe));
                         if (enrichedWillBe.commonLesson) {
-                            enrichedWillBe.commonLesson.group = studentProfile.name || "КС-1-3";
+                            enrichedWillBe.commonLesson.group = studentProfile.name || "Группа";
                         }
                         effectiveOverrides.push({ ...stOv, willBe: enrichedWillBe, shouldBe: normalizeLesson(stOv.shouldBe) });
                     }
@@ -1228,7 +1358,6 @@ export function ScheduleScreen() {
         .calendar-btn-secondary { background: var(--color-surface-container); color: var(--color-text); padding: 14px; border-radius: 16px; border: none; font-weight: 700; cursor: pointer; }
         @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         
-        /* New Cat Loader Styles */
         .cat-loader-container { width: fit-content; height: fit-content; display: flex; align-items: center; justify-content: center; margin: 50px auto; }
         .cat-wrapper { width: fit-content; height: fit-content; display: flex; flex-direction: column; justify-content: center; align-items: center; }
         .cat-svg-container { width: 100%; height: fit-content; display: flex; align-items: center; justify-content: center; position: relative; }
@@ -1240,12 +1369,238 @@ export function ScheduleScreen() {
         .cat-bigzzz { color: var(--color-primary); font-weight: 700; font-size: 25px; margin-left: 10px; animation: zzz 2.3s linear infinite; }
         @keyframes tail { 0% { transform: rotateZ(60deg); } 50% { transform: rotateZ(0deg); } 100% { transform: rotateZ(-20deg); } }
         @keyframes zzz { 0% { color: transparent; } 50% { color: var(--color-primary); } 100% { color: transparent; } }
+
+        .floating-notification-banner {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 400px;
+            background: rgba(30, 30, 30, 0.95);
+            backdrop-filter: blur(12px);
+            border-radius: 20px;
+            padding: 14px 18px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 2000;
+            border: 1px solid rgba(255,255,255,0.1);
+            animation: slideDownFade 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @media (prefers-color-scheme: light) {
+             .floating-notification-banner { background: rgba(255, 255, 255, 0.95); border: 1px solid rgba(0,0,0,0.05); }
+             .notif-title { color: #000; }
+             .notif-desc { color: #666; }
+        }
+        @keyframes slideDownFade {
+            from { opacity: 0; transform: translate(-50%, -30px); }
+            to { opacity: 1; transform: translate(-50%, 0); }
+        }
+        .notif-content { display: flex; align-items: center; gap: 14px; }
+        .notif-icon-box {
+            width: 40px; height: 40px;
+            border-radius: 14px;
+            background: rgba(140, 103, 246, 0.15); 
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .gradient-icon {
+            background: -webkit-linear-gradient(135deg, #6200ea, #9d46ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .notif-text { display: flex; flex-direction: column; }
+        .notif-title { font-weight: 700; font-size: 14px; color: #fff; }
+        .notif-desc { font-weight: 500; font-size: 11px; color: rgba(255,255,255,0.7); margin-top: 1px; }
+        .notif-actions { display: flex; align-items: center; gap: 8px; }
+        .notif-btn {
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 12px;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+        .notif-btn.primary { background: #fff; color: #6200ea; }
+        .notif-btn.secondary { background: rgba(255,255,255,0.15); color: #fff; }
+        .notif-close-btn {
+            background: transparent;
+            border: none;
+            color: rgba(255,255,255,0.5);
+            display: flex; align-items: center;
+            padding: 4px;
+            cursor: pointer;
+        }
+        
+        .dropdown-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            background: transparent;
+        }
+        .dropdown-menu-attached {
+            position: absolute;
+            top: 120%; 
+            right: 0; 
+            background: var(--color-surface);
+            border-radius: 18px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            padding: 8px;
+            width: 260px;
+            z-index: 1001;
+            border: 1px solid var(--color-border);
+            animation: scaleIn 0.2s ease forwards;
+            transform-origin: top right;
+        }
+        @keyframes scaleIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        
+        .dropdown-item {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            padding: 10px 14px;
+            border: none;
+            background: transparent;
+            color: #6200ea; 
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            border-radius: 10px;
+            transition: background 0.1s;
+            text-align: left;
+            gap: 12px;
+        }
+        .dropdown-item .material-icons {
+            font-size: 20px;
+            color: #6200ea; 
+            opacity: 1;
+        }
+        .dropdown-item:hover {
+            background: var(--color-surface-container);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .dropdown-item {
+                color: #ffffff; 
+            }
+            .dropdown-item .material-icons {
+                color: #ffffff; 
+            }
+            .dropdown-item:hover {
+                background: rgba(255, 255, 255, 0.1);
+            }
+        }
+
+        .modern-snackbar {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 380px;
+            background: rgba(20, 20, 20, 0.85); 
+            backdrop-filter: blur(16px); 
+            color: #fff;
+            border-radius: 24px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            z-index: 2100;
+            overflow: hidden;
+            animation: slideUpSnack 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+            border: 1px solid rgba(255,255,255,0.08);
+            display: flex;
+            align-items: center;
+            padding-right: 6px;
+        }
+        
+        @media (prefers-color-scheme: light) {
+             .modern-snackbar { 
+                background: rgba(255, 255, 255, 0.85); 
+                color: #000; 
+                border: 1px solid rgba(0,0,0,0.05); 
+                box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+             }
+             .snackbar-title { color: #000; }
+             .snackbar-message { color: rgba(0,0,0,0.7); }
+             .snackbar-btn { background: rgba(0,0,0,0.05); color: #000; }
+             .snackbar-left-border { background: #6200ea; }
+        }
+
+        @keyframes slideUpSnack { from { transform: translate(-50%, 100px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+        
+        .snackbar-left-border {
+            width: 4px;
+            height: 40px;
+            background: #fff;
+            border-radius: 10px;
+            margin-left: 16px;
+        }
+
+        .snackbar-content { display: flex; align-items: center; padding: 14px 16px; gap: 14px; flex: 1; }
+        
+        .snackbar-icon-area {
+            width: 40px; height: 40px;
+            background: linear-gradient(135deg, #6200ea, #9d46ff);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+            box-shadow: 0 4px 10px rgba(98, 0, 234, 0.4);
+        }
+        
+        .snackbar-text-area { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+        .snackbar-title { font-weight: 800; font-size: 14px; margin-bottom: 2px; letter-spacing: 0.3px; }
+        .snackbar-message { font-size: 12px; opacity: 0.8; line-height: 1.3; font-weight: 500; }
+        
+        .snackbar-actions {
+            padding-right: 8px;
+        }
+        .snackbar-btn {
+            padding: 8px 14px;
+            background: rgba(255,255,255,0.15);
+            border: none;
+            border-radius: 14px;
+            color: inherit;
+            font-weight: 700;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s;
+        }
+        .snackbar-btn:active { transform: scale(0.95); }
+
+        .container { position: relative; }
       `}</style>
       <div className="container" style={{ fontFamily: 'Inter, sans-serif' }}>
         <div className="schedule-header">
           <h2 className="schedule-title" style={{ fontWeight: 800 }}>Расписание</h2>
-          <button id="tour-menu" className="menu-button" onClick={() => setIsMenuOpen(true)}><Icon name="more_vert" /></button>
+          
+          <div style={{ position: 'relative' }}>
+              <button id="tour-menu" className="menu-button" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+                <Icon name="more_vert" />
+              </button>
+              <DropdownMenu 
+                  isOpen={isMenuOpen} 
+                  onClose={() => setIsMenuOpen(false)} 
+                  onCheckOverrides={checkOverrides} 
+                  onOpenHistory={() => setIsHistoryOpen(true)} 
+                  onOpenNotes={() => setIsNotesModalOpen(true)} 
+                  onInstallApp={handleInstallApp} 
+                  onOpenAllEvents={() => setIsAllEventsModalOpen(true)} 
+                  onStartTour={startTour} 
+                  onRateApp={() => setIsRateModalOpen(true)} 
+                  onAddCourse={() => setIsAddCourseOpen(true)} 
+                  onSubscribePush={handlePushSubscription}
+                  isPushEnabled={isPushEnabled} 
+              />
+          </div>
         </div>
+        
         <div id="tour-profile">
             <ProfileSwitcher 
               key={appState.lastUsed} 
@@ -1256,6 +1611,16 @@ export function ScheduleScreen() {
               isLoading={isSwitchingProfile} 
             />
         </div>
+        
+        {showPushBanner && (
+            <FloatingNotificationBanner 
+                isEnabled={isPushEnabled} 
+                onToggle={handlePushSubscription} 
+                isSupported={isPushSupported}
+                onClose={() => setShowPushBanner(false)} 
+            />
+        )}
+
         <PracticeBanner info={practiceInfo} onClick={handlePracticeClick} />
         <PracticeDetailsModal isOpen={isPracticeModalOpen} onClose={() => setIsPracticeModalOpen(false)} info={practiceInfo} currentProfileId={currentProfileId} calendarEvents={calendarEvents} onNavigateToDate={handleNavigateToDate} />
         <div id="tour-days" className={`schedule-tabs-container ${swipeLimitReached ? 'limit-reached' : ''}`} ref={tabsContainerRef}>
@@ -1315,7 +1680,7 @@ export function ScheduleScreen() {
           ) : error ? (<div className="error-state"><p>{error}</p><button onClick={() => window.location.reload()}>Обновить</button></div>) : renderLessons()}
           {!error && (<div className="overrides-toggle-container"><button className={`overrides-toggle ${applyOverrides ? 'active' : ''}`} onClick={toggleApplyOverrides} disabled={isSwitchingProfile}><Icon name="swap_horiz" /><span>Учитывать замены</span></button></div>)}
         </div>
-        <DropdownMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onCheckOverrides={checkOverrides} onOpenHistory={() => setIsHistoryOpen(true)} onOpenNotes={() => setIsNotesModalOpen(true)} onInstallApp={handleInstallApp} onOpenAllEvents={() => setIsAllEventsModalOpen(true)} onStartTour={startTour} onRateApp={() => setIsRateModalOpen(true)} onAddCourse={() => setIsAddCourseOpen(true)} />
+        
         <AddCourseModal isOpen={isAddCourseOpen} onClose={() => setIsAddCourseOpen(false)} activeWeek={activeWeekIndex} activeDay={activeDayIndex} schedule={fullSchedule} overrides={applyOverrides ? overrides : null} profileId={currentProfileId} />
         <CustomCalendar isOpen={isCalendarOpen} onClose={() => setIsCalendarOpen(false)} onSelectDate={handleDateSelect} currentDate={selectedDate} calendarEvents={calendarEvents} />
         <NoteModal lesson={lessonToEdit} onClose={() => setEditingLessonIndex(null)} onSave={handleSaveNote} savedNote={currentLessonData.notes} savedSubgroup={currentLessonData.subgroup} />

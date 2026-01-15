@@ -1,7 +1,8 @@
 // src/api.ts
 import { InfoResponse } from '../types';
 
-const API_BASE_URL = 'https://schedulettgt.ru';
+// 🔥 СОВЕТ: Если работаешь локально, используй http://127.0.0.1:8000
+const API_BASE_URL = 'https://schedulettgt.ru'; 
 const CACHE_DURATION = 5 * 60 * 1000;
 
 function getFromCache<T>(key: string): T | null {
@@ -45,14 +46,27 @@ export const scheduleApi = {
     const cached = getFromCache<any>(cacheKey);
     if (cached) return cached;
 
-    const response = await fetch(`${API_BASE_URL}/schedule/items`);
-    const data = await response.json();
-    saveToCache(cacheKey, data);
-    return data;
+    try {
+        const response = await fetch(`${API_BASE_URL}/schedule/items`, {
+            mode: 'cors',
+            credentials: 'include'
+        });
+        if (!response.ok) throw new Error(`API Error: ${response.status}`);
+        const data = await response.json();
+        saveToCache(cacheKey, data);
+        return data;
+    } catch (err) {
+        console.error("Fetch items failed:", err);
+        throw err;
+    }
   },
 
   getSchedule: async (id: string) => {
-    const response = await fetch(`${API_BASE_URL}/schedule/${encodeURIComponent(id)}/schedule`);
+    const response = await fetch(`${API_BASE_URL}/schedule/${encodeURIComponent(id)}/schedule`, {
+        mode: 'cors',
+        credentials: 'include'
+    });
+    if (!response.ok) throw new Error(`Schedule fetch error: ${response.status}`);
     const data = await response.json();
     if (data.weeks) {
       data.weeks = data.weeks.map((week: any) => ({
@@ -72,7 +86,10 @@ export const scheduleApi = {
       schedule_update: scheduleUpdate.toString(),
       events_hash: eventsHash
     });
-    const response = await fetch(`${API_BASE_URL}/schedule/${encodeURIComponent(id)}/info?${params.toString()}`);
+    const response = await fetch(`${API_BASE_URL}/schedule/${encodeURIComponent(id)}/info?${params.toString()}`, {
+        mode: 'cors',
+        credentials: 'include'
+    });
     if (!response.ok) throw new Error(`Status: ${response.status}`);
     const data = await response.json();
 
@@ -92,30 +109,64 @@ export const scheduleApi = {
     const response = await fetch(`${API_BASE_URL}/schedule/rate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
+      body: JSON.stringify(data),
+      mode: 'cors',
+      credentials: 'include'
     });
+    return response.json();
+  },
+
+  subscribePush: async (subscription: any, itemName: string, active: boolean = true) => {
+    const response = await fetch(`${API_BASE_URL}/schedule/push/subscribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        subscription, 
+        item_name: itemName,
+        active: active 
+      }),
+      mode: 'cors',
+      credentials: 'include'
+    });
+    if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(`Subscription failed: ${errorData}`);
+    }
     return response.json();
   }
 };
 
-/**
- * 🔥 ФУНКЦИЯ ДЛЯ СОВМЕСТИМОСТИ (Welcome.tsx её требует)
- */
 export async function fetchData(endpoint: string): Promise<any> {
   const clean = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
   
-  if (clean === 'items') {
+  if (clean === 'items' || clean === 'schedule/items') {
     return scheduleApi.getItems();
   }
   
   const parts = clean.split('/');
-  if (parts.length >= 2 && parts[1] === 'schedule') {
-    return scheduleApi.getSchedule(decodeURIComponent(parts[0]));
+  if (parts.length >= 2 && parts[parts.length - 1] === 'schedule') {
+    const id = parts.slice(0, parts.length - 1).join('/');
+    return scheduleApi.getSchedule(decodeURIComponent(id));
   }
 
-  // Универсальный фолбэк для остальных запросов
-  const response = await fetch(`${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`);
-  return response.json();
+  let finalUrl = '';
+  if (clean.startsWith('schedule/')) {
+      finalUrl = `${API_BASE_URL}/${clean}`;
+  } else {
+      finalUrl = `${API_BASE_URL}/schedule/${clean}`;
+  }
+
+  try {
+    const response = await fetch(finalUrl, { mode: 'cors', credentials: 'include' });
+    if (!response.ok) {
+        const fallbackResponse = await fetch(`${API_BASE_URL}/${clean}`, { mode: 'cors', credentials: 'include' });
+        return fallbackResponse.json();
+    }
+    return response.json();
+  } catch (err) {
+    console.error("FetchData error:", err);
+    throw err;
+  }
 }
 
 export default scheduleApi;
