@@ -8,7 +8,23 @@ import { AllNotesModal } from '../components/AllNotesModal';
 import { Schedule, OverridesResponse, Lesson, CalendarEvent } from '../types';
 import { ProfileType } from '../types/profiles';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'; 
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, getDay, startOfWeek, addDays, parseISO, differenceInCalendarDays, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import { 
+  format, 
+  startOfMonth, 
+  endOfMonth, 
+  eachDayOfInterval, 
+  isSameDay, 
+  addMonths, 
+  subMonths, 
+  getDay, 
+  startOfWeek, 
+  addDays, 
+  parseISO, 
+  differenceInCalendarDays, 
+  isWithinInterval, 
+  startOfDay, 
+  endOfDay 
+} from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { scheduleApi } from '../api'; 
 import { useScheduleState } from '../hooks/useScheduleState';
@@ -25,6 +41,9 @@ import { findNextPractice, findUpcomingEvent, PracticeInfo } from '../utils/prac
 import { ActiveSubscriptionsModal } from '../components/ActiveSubscriptionsModal'; 
 import { SupportModal } from '../components/SupportModal'; 
 
+/**
+ * Интерфейс данных заметки для конкретного урока
+ */
 interface LessonData {
   notes: string;
   subgroup: number;
@@ -33,7 +52,9 @@ interface LessonData {
 
 const DAYS_OF_WEEK = [ 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница' ];
 
-// 🔥 ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ VAPID КЛЮЧА
+/**
+ * Вспомогательная функция для преобразования VAPID ключа
+ */
 function urlBase64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -51,6 +72,9 @@ function getCourseFromGroupName(groupName: string): number | null {
   return match ? parseInt(match[1], 10) : null;
 }
 
+/**
+ * Группирует уроки по подгруппам.
+ */
 function groupSubgroups(lessons: any[], isTeacherView: boolean): any[] {
   if (!lessons || !Array.isArray(lessons)) return lessons;
   if (isTeacherView) return lessons;
@@ -117,6 +141,10 @@ function groupSubgroups(lessons: any[], isTeacherView: boolean): any[] {
   return groupedLessons;
 }
 
+/**
+ * Нормализует объект урока к единому формату Lesson.
+ * 🔥 ИСПРАВЛЕНИЕ: Гарантирует наличие subgroup_index в commonLesson.
+ */
 export function normalizeLesson(lesson: any): Lesson {
   if (lesson == null || lesson === 'null' || (typeof lesson === 'object' && Object.keys(lesson).length === 0)) {
     return { noLesson: {} };
@@ -151,7 +179,8 @@ export function normalizeLesson(lesson: any): Lesson {
         name: common.name || '',
         teacher: common.teacher || '',
         room: common.room || '',
-        group: localGroup || globalGroup 
+        group: localGroup || globalGroup,
+        subgroup_index: common.subgroup_index || common.subgroup || 0
       }
     };
   }
@@ -166,7 +195,7 @@ export function normalizeLesson(lesson: any): Lesson {
           return {
             teacher: sub.teacher || '',
             room: sub.room || '',
-            subgroup_index: sub.subgroup_index || 0,
+            subgroup_index: sub.subgroup_index || sub.subgroup || 0,
             group: subLocalGroup || globalGroup 
           };
         })
@@ -175,25 +204,13 @@ export function normalizeLesson(lesson: any): Lesson {
   }
    
   if (lesson.name || lesson.teacher || lesson.room) {
-    if (lesson.subgroup_index !== undefined) {
-      return {
-        subgroupedLesson: {
-          name: lesson.name || '',
-          subgroups: [{
-            teacher: lesson.teacher || '',
-            room: lesson.room || '',
-            subgroup_index: lesson.subgroup_index || 1,
-            group: lesson.group || ''
-          }]
-        }
-      };
-    }
     return {
       commonLesson: {
         name: lesson.name || '',
         teacher: lesson.teacher || '',
         room: lesson.room || '',
-        group: lesson.group || globalGroup
+        group: lesson.group || globalGroup,
+        subgroup_index: lesson.subgroup_index || lesson.subgroup || 0
       }
     };
   }
@@ -386,10 +403,6 @@ function CustomCalendar({ isOpen, onClose, onSelectDate, currentDate, calendarEv
   ); 
 }
 
-/**
- * 🔥 DropdownMenu: С иконками одного цвета и текстом другого.
- * Исправлены имена пропсов для предотвращения ReferenceError.
- */
 function DropdownMenu({ 
   isOpen, 
   onClose, 
@@ -403,7 +416,7 @@ function DropdownMenu({
   onRateApp,
   onSubscribePush,
   isPushEnabled,
-  onOpenSubsList, // 🔥 Имя исправлено здесь
+  onOpenSubsList, 
   onSupport 
 }: { 
   isOpen: boolean; 
@@ -418,7 +431,7 @@ function DropdownMenu({
   onRateApp: () => void; 
   onSubscribePush: () => void;
   isPushEnabled: boolean; 
-  onOpenSubsList: () => void; // 🔥 И здесь
+  onOpenSubsList: () => void; 
   onSupport: () => void;
 }) { 
   const navigate = useNavigate(); 
@@ -434,7 +447,7 @@ function DropdownMenu({
     else if (action === 'notes') { onOpenNotes(); } 
     else if (action === 'install') { onInstallApp(); } 
     else if (action === 'allEvents') { onOpenAllEvents(); }
-    else if (action === 'subsList') { onOpenSubsList(); } // 🔥 Теперь onOpenSubsList определен
+    else if (action === 'subsList') { onOpenSubsList(); } 
     else if (action === 'support') { onSupport(); } 
     else if (action === 'rate') { onRateApp(); } 
     else if (action === 'push') { onSubscribePush(); } 
@@ -627,8 +640,16 @@ export function ScheduleScreen() {
   }, []);
 
   /**
-   * 🔥 handleSupportSubmit: Исправлено — окно скрывается после отправки
+   * 🔥 РЕШЕНИЕ ПРОБЛЕМЫ КЭША
    */
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready.then(registration => {
+        registration.update().catch(() => {});
+      });
+    }
+  }, []);
+
   const handleSupportSubmit = async (text: string) => {
     try {
       setIsSupportLoading(true);
@@ -641,12 +662,10 @@ export function ScheduleScreen() {
       };
 
       await scheduleApi.postRate(payload);
-      
-      // 🔥 ОБЯЗАТЕЛЬНО СКРЫВАЕМ ОКНО
       setIsSupportOpen(false);
       showMessage("Ваше обращение отправлено! ❤️");
     } catch(e) {
-      setIsSupportOpen(false); // 🔥 И при ошибке тоже
+      setIsSupportOpen(false); 
       showMessage("Ваше обращение отправлено! ❤️");
     } finally {
       setIsSupportLoading(false);
@@ -673,7 +692,7 @@ export function ScheduleScreen() {
   useEffect(() => { checkSubscriptionStatus(); }, [checkSubscriptionStatus]);
 
   const handlePushSubscription = async () => {
-    if (!isPushSupported) { showMessage("Не поддерживается"); return; }
+    if (!isPushSupported) { showMessage("Браузер не поддерживает уведомления"); return; }
     localStorage.setItem(`push_banner_processed_${currentProfileId}`, 'true');
     setShowPushBanner(false);
 
@@ -780,7 +799,10 @@ export function ScheduleScreen() {
         }
         await dataStore.updateProfileMetadata(profileId, { scheduleUpdate: info.schedule_update || metadata.scheduleUpdate, eventsHash: info.events?.sha256 || metadata.eventsHash, events: events });
         await dataStore.updateData(s => ({ ...s, profiles: { ...s.profiles, [profileType === ProfileType.TEACHER ? 'teacher' : 'student']: { ...s.profiles[profileType === ProfileType.TEACHER ? 'teacher' : 'student'], id: profileId, schedule: info.schedule || fullSchedule, overrides: info.overrides || overrides } } }));
-    } catch (err) { if (!fullSchedule) setError('Ошибка сервера'); } finally { setIsLoading(false); }
+    } catch (err) { 
+        console.error("Load Error:", err); 
+        if (!fullSchedule) setError('Ошибка сервера. Попробуйте позже.'); 
+    } finally { setIsLoading(false); }
   }, [fullSchedule, overrides, addEntry]);
 
   const handleProfileSwitch = useCallback(async (newType: ProfileType, newProfile: any) => {
@@ -831,8 +853,8 @@ export function ScheduleScreen() {
   const handleInstallApp = useCallback(async () => {
     if (!deferredPrompt) {
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-      if (isIOS) { showMessage("Нажмите кнопку 'Поделиться' и выберите 'На экран Домой'"); } 
-      else { showMessage("Используйте меню браузера -> 'Установить'"); }
+      if (isIOS) { showMessage("Нажмите кнопку 'Поделиться' и выберите 'На экран «Домой»'"); } 
+      else { showMessage("Используйте меню браузера -> 'Установить приложение'"); }
       return;
     }
     deferredPrompt.prompt();
@@ -962,6 +984,10 @@ export function ScheduleScreen() {
     }
   }, [selectedDateTime, currentProfileId, loadProfileData]);
 
+  /**
+   * 🔥 ОСНОВНАЯ ЛОГИКА ПРИМЕНЕНИЯ ЗАМЕН (Слияние и фильтрация)
+   * Исправлена для кейсов Л-1-2 и Д-1-1.
+   */
   useEffect(() => {
     if (!fullSchedule) { setDisplaySchedule(null); return; }
     const newSchedule = JSON.parse(JSON.stringify(fullSchedule)) as Schedule;
@@ -989,6 +1015,10 @@ export function ScheduleScreen() {
         effectiveOverrides = [...(overrides.overrides || [])];
         substitutesDateMatches = overrides.day === curDate.getDate() && overrides.month === curDate.getMonth() && overrides.year === curDate.getFullYear();
     }
+    
+    /**
+     * 🔥 ЛОГИКА ДЛЯ ПРЕПОДАВАТЕЛЯ: Импорт замен из студенческого профиля
+     */
     if (isTeacherView && appState.profiles.student) {
         const studentProfile = appState.profiles.student;
         const stOverrides = studentProfile.overrides;
@@ -1012,6 +1042,7 @@ export function ScheduleScreen() {
             }
         }
     }
+
     const isAttestation = overrides?.practiceCode === '::' || overrides?.practiceCode === ':';
     const isHoliday = overrides?.practiceCode === '=' || overrides?.practiceCode === '*';
     const isPracticeActiveToday = overrides?.isPractice && overrides?.dateStart && overrides?.dateEnd && isWithinInterval(curDate, { start: startOfDay(parseISO(overrides.dateStart)), end: endOfDay(parseISO(overrides.dateEnd)) });
@@ -1022,25 +1053,76 @@ export function ScheduleScreen() {
             day.lessons = day.lessons.map(() => practicePlaceholder);
         }
     }
+
+    /**
+     * 🔥 УМНОЕ ПРИМЕНЕНИЕ ЗАМЕН (Слияние и удаление подгрупп)
+     */
     if (substitutesDateMatches && effectiveOverrides.length > 0) {
       const day = currentWeekData.days[activeDayIndex];
       if (day && day.lessons) {
         effectiveOverrides.forEach(override => {
           if (day.lessons[override.index] !== undefined) {
-              const originalLesson = day.lessons[override.index];
-              const overrideWillBe = override.willBe;
-              if (isTeacherView) { day.lessons[override.index] = overrideWillBe; } 
+              const currentLessonInGrid = day.lessons[override.index];
+              const willBe = normalizeLesson(override.willBe);
+              const shouldBe = normalizeLesson(override.shouldBe);
+
+              // 1. ПРОВЕРКА НА ОТМЕНУ ПОДГРУППЫ (Д-1-1)
+              const isCancellation = willBe.noLesson || (willBe.commonLesson?.teacher?.toLowerCase() === 'нет');
+              
+              if (isCancellation) {
+                  if (currentLessonInGrid && currentLessonInGrid.subgroupedLesson) {
+                      const teacherToRemove = (shouldBe.commonLesson?.teacher || "").split(' ')[0];
+                      const remainingSubgroups = currentLessonInGrid.subgroupedLesson.subgroups.filter(
+                          s => !s.teacher.includes(teacherToRemove)
+                      );
+                      
+                      if (remainingSubgroups.length > 0) {
+                          day.lessons[override.index] = {
+                              subgroupedLesson: {
+                                  name: currentLessonInGrid.subgroupedLesson.name,
+                                  subgroups: remainingSubgroups
+                              }
+                          };
+                      } else {
+                          day.lessons[override.index] = { noLesson: {} };
+                      }
+                  } else {
+                      day.lessons[override.index] = { noLesson: {} };
+                  }
+              } 
+              // 2. СЛИЯНИЕ ПОДГРУПП (Л-1-2)
               else {
-                  if (originalLesson?.subgroupedLesson && overrideWillBe?.noLesson) {
-                    const shouldBeTeacher = override.shouldBe.commonLesson?.teacher;
-                    if (shouldBeTeacher) {
-                       const teacherLastName = shouldBeTeacher.split(' ')[0];
-                       const remainingSubgroups = originalLesson.subgroupedLesson.subgroups.filter((sub: any) => !sub.teacher.includes(teacherLastName));
-                       if (remainingSubgroups.length > 0) { day.lessons[override.index] = { subgroupedLesson: { name: originalLesson.subgroupedLesson.name, subgroups: remainingSubgroups } }; } 
-                       else { day.lessons[override.index] = { noLesson: {} }; }
-                    } else { day.lessons[override.index] = overrideWillBe; }
-                  } else if (originalLesson?.subgroupedLesson && overrideWillBe?.subgroupedLesson) { day.lessons[override.index] = processSubgroupedOverride(originalLesson, overrideWillBe); } 
-                  else { day.lessons[override.index] = overrideWillBe; }
+                  // Если в этой ячейке уже была применена замена (appliedByOverride)
+                  if (currentLessonInGrid && (currentLessonInGrid as any).appliedByOverride) {
+                      const existingSubs = currentLessonInGrid.subgroupedLesson 
+                          ? [...currentLessonInGrid.subgroupedLesson.subgroups] 
+                          : [currentLessonInGrid.commonLesson];
+                      
+                      const newSubs = willBe.subgroupedLesson 
+                          ? [...willBe.subgroupedLesson.subgroups] 
+                          : [willBe.commonLesson];
+
+                      const mergedMap = new Map();
+                      // Наполняем карту: ключ - индекс подгруппы, значение - объект подгруппы
+                      [...existingSubs, ...newSubs].forEach(s => {
+                          if (s && s.teacher && s.teacher !== 'нет') {
+                            mergedMap.set(s.subgroup_index || 0, s);
+                          }
+                      });
+
+                      day.lessons[override.index] = {
+                          subgroupedLesson: {
+                              name: willBe.commonLesson?.name || willBe.subgroupedLesson?.name || "Информатика",
+                              subgroups: Array.from(mergedMap.values()).sort((a,b) => (a.subgroup_index || 0) - (b.subgroup_index || 0))
+                          }
+                      };
+                  } else {
+                      day.lessons[override.index] = willBe;
+                  }
+              }
+              // Помечаем урок как результат замены
+              if (day.lessons[override.index]) {
+                  (day.lessons[override.index] as any).appliedByOverride = true;
               }
           }
         });
@@ -1172,11 +1254,20 @@ export function ScheduleScreen() {
             border: 1px solid rgba(255,255,255,0.1);
             animation: slideDownFade 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
+
+        /* 🔥 ИСПРАВЛЕНИЕ: Цвета текста в уведомлении для светлой темы */
         @media (prefers-color-scheme: light) {
-             .floating-notification-banner { background: rgba(255, 255, 255, 0.95); border: 1px solid rgba(0,0,0,0.05); }
-             .notif-title { color: #000; }
-             .notif-desc { color: #666; }
+             .floating-notification-banner { 
+               background: rgba(255, 255, 255, 0.98) !important; 
+               border: 1px solid rgba(0,0,0,0.12) !important; 
+               box-shadow: 0 12px 35px rgba(0,0,0,0.15) !important;
+             }
+             .notif-title { color: #000000 !important; font-weight: 800; }
+             .notif-desc { color: #444444 !important; font-weight: 500; }
+             .notif-btn.primary { background: #8c67f6 !important; color: #ffffff !important; }
+             .notif-close-btn { color: #a88ce6 !important; opacity: 1; }
         }
+
         @keyframes slideDownFade { from { opacity: 0; transform: translate(-50%, -30px); } to { opacity: 1; transform: translate(-50%, 0); } }
         .notif-content { display: flex; align-items: center; gap: 14px; }
         .notif-icon-box { width: 40px; height: 40px; border-radius: 14px; background: rgba(140, 103, 246, 0.15); display: flex; align-items: center; justify-content: center; }
@@ -1270,7 +1361,6 @@ export function ScheduleScreen() {
               <button id="tour-menu" className="menu-button" onClick={() => setIsMenuOpen(!isMenuOpen)}>
                 <Icon name="more_vert" />
               </button>
-              {/* 🔥 Пропсы синхронизированы — ReferenceError больше не будет */}
               <DropdownMenu 
                   isOpen={isMenuOpen} 
                   onClose={() => setIsMenuOpen(false)} 
@@ -1284,7 +1374,7 @@ export function ScheduleScreen() {
                   onAddCourse={() => setIsAddCourseOpen(true)} 
                   onSubscribePush={handlePushSubscription}
                   isPushEnabled={isPushEnabled} 
-                  onOpenSubsList={() => setIsSubsListOpen(true)} // 🔥 Имя исправлено
+                  onOpenSubsList={() => setIsSubsListOpen(true)}
                   onSupport={() => setIsSupportOpen(true)}
               />
           </div>
@@ -1364,7 +1454,6 @@ export function ScheduleScreen() {
         <CustomCalendar isOpen={isCalendarOpen} onClose={() => setIsCalendarOpen(false)} onSelectDate={handleDateSelect} currentDate={selectedDate} calendarEvents={calendarEvents} />
         <NoteModal lesson={lessonToEdit} onClose={() => setEditingLessonIndex(null)} onSave={handleSaveNote} savedNote={currentLessonData.notes} savedSubgroup={currentLessonData.subgroup} />
         
-        {/* 🔥 ПОДКЛЮЧЕНИЕ МОДАЛОК */}
         <ActiveSubscriptionsModal isOpen={isSubsListOpen} onClose={() => setIsSubsListOpen(false)} />
         <SupportModal isOpen={isSupportOpen} onClose={() => setIsSupportOpen(false)} onSubmit={handleSupportSubmit} isLoading={isSupportLoading} />
         
