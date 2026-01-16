@@ -1,13 +1,30 @@
 // public/sw.js
-const CACHE_NAME = 'ttgt-schedule-v4.3.0';
-const APP_VERSION = '4.3.0';
+const CACHE_NAME = 'ttgt-schedule-v4.3.2'; // Подняли версию для обновления
+const APP_VERSION = '4.3.2';
 
-const PRECACHE_URLS = ['/', '/index.html', '/manifest.json'];
+// ВАЖНО: Здесь должны быть только те файлы, которые РЕАЛЬНО лежат в папке public
+// или которые Vite копирует в корень dist (manifest, favicon и т.д.)
+const PRECACHE_URLS = [
+  '/manifest.json',
+  '/favicon.ico',
+  '/vite.svg', // Исправлено: в папке public лежит vite.svg, а не react.svg
+  '/icon-192x192.png',
+  '/icon-512x512.png'
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(PRECACHE_URLS))
+      .then((cache) => {
+        // Мы используем map, чтобы отловить конкретный файл, который не грузится
+        return Promise.all(
+          PRECACHE_URLS.map(url => {
+            return cache.add(url).catch(err => {
+              console.error(`❌ Ошибка кэширования файла: ${url}`, err);
+            });
+          })
+        );
+      })
       .then(() => self.skipWaiting())
   );
 });
@@ -17,7 +34,10 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) return caches.delete(cacheName);
+          if (cacheName !== CACHE_NAME) {
+            console.log('🧹 Удаление старого кэша:', cacheName);
+            return caches.delete(cacheName);
+          }
         })
       );
     }).then(() => self.clients.claim())
@@ -64,7 +84,22 @@ self.addEventListener('push', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (event.request.method !== 'GET') return;
+
+  // 1. СТРАТЕГИЯ ДЛЯ INDEX.HTML И КОРНЯ (Network First)
+  if (url.origin === self.location.origin && (url.pathname === '/' || url.pathname === '/index.html')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          const clonedResponse = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clonedResponse));
+          return response;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
   
+  // 2. СТРАТЕГИЯ ДЛЯ API
   if (url.pathname.includes('/schedule') || url.pathname.includes('/overrides')) {
     event.respondWith(
       fetch(event.request).then((response) => {
@@ -84,8 +119,6 @@ self.addEventListener('fetch', (event) => {
       }).catch(async (err) => {
         const cached = await caches.match(event.request);
         if (cached) return cached;
-        
-        // 🔥 ВОЗВРАЩАЕМ КОРРЕКТНЫЙ RESPONSE ПРИ СБОЕ
         return new Response(
             JSON.stringify({ error: "Network Error", detail: err.message }), 
             {
@@ -98,8 +131,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
+  // 3. СТРАТЕГИЯ ДЛЯ СТАТИКИ (Cache First)
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    caches.match(event.request).then((cached) => {
+      if (cached) return cached;
+      return fetch(event.request).then(response => {
+        if (response.ok && (url.origin === self.location.origin)) {
+           const resClone = response.clone();
+           caches.open(CACHE_NAME).then(cache => cache.put(event.request, resClone));
+        }
+        return response;
+      });
+    })
   );
 });
 

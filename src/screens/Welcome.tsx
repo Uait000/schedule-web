@@ -383,7 +383,7 @@ export function WelcomeScreen() {
         )}
 
         <div className="debug-info" style={{ marginTop: '20px', fontSize: '12px', color: '#666', textAlign: 'center' }}>
-          <p><strong>Версия приложения:</strong> 2.0.1 (Turbo Cat)</p>
+          <p><strong>Версия приложения:</strong> 2.2.3</p>
         </div>
       </div>
     </>
