@@ -22,9 +22,11 @@ import {
   differenceInCalendarDays, 
   isWithinInterval, 
   startOfDay, 
-  endOfDay 
+  endOfDay,
+  subDays
 } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import { createPortal } from 'react-dom';
 import { scheduleApi } from '../api'; 
 import { useScheduleState } from '../hooks/useScheduleState';
 import { getDayIndex, getWeekNumber } from '../utils/dateUtils';
@@ -37,7 +39,6 @@ import { PracticeDetailsModal } from '../components/PracticeDetailsModal';
 import { AllEventsModal } from '../components/AllEventsModal'; 
 import { RateModal } from '../components/RateModal'; 
 import { findNextPractice, findUpcomingEvent, PracticeInfo } from '../utils/practiceUtils';
-import { ActiveSubscriptionsModal } from '../components/ActiveSubscriptionsModal'; 
 import { SupportModal } from '../components/SupportModal'; 
 
 const CURRENT_APP_VERSION = '2.9.2';
@@ -412,8 +413,9 @@ function DropdownMenu({
   onOpenAllEvents,
   onStartTour,
   onRateApp,
-  onOpenSubsList, 
-  onSupport 
+  onSupport,
+  isTeacher,
+  onOpenMonitoring
 }: { 
   isOpen: boolean; 
   onClose: () => void; 
@@ -425,8 +427,9 @@ function DropdownMenu({
   onOpenAllEvents: () => void;
   onStartTour: () => void;
   onRateApp: () => void; 
-  onOpenSubsList: () => void; 
   onSupport: () => void;
+  isTeacher: boolean;
+  onOpenMonitoring: () => void;
 }) { 
   const navigate = useNavigate(); 
    
@@ -441,7 +444,7 @@ function DropdownMenu({
     else if (action === 'notes') { onOpenNotes(); } 
     else if (action === 'install') { onInstallApp(); } 
     else if (action === 'allEvents') { onOpenAllEvents(); }
-    else if (action === 'subsList') { onOpenSubsList(); } 
+    else if (action === 'monitoring') { onOpenMonitoring(); }
     else if (action === 'support') { onSupport(); } 
     else if (action === 'rate') { onRateApp(); } 
     else if (action === 'changeGroup') { 
@@ -459,6 +462,12 @@ function DropdownMenu({
               <Icon name="sync_alt" /><span>Проверить изменения</span>
             </button> 
 
+            {isTeacher && (
+              <button className="dropdown-item" onClick={() => handleMenuClick('monitoring')}>
+                <Icon name="visibility" /><span>Окна у групп</span>
+              </button>
+            )}
+
             <button className="dropdown-item" onClick={() => handleMenuClick('allEvents')}>
               <Icon name="event_repeat" /><span>График событий</span>
             </button> 
@@ -470,11 +479,6 @@ function DropdownMenu({
             <button className="dropdown-item" onClick={() => handleMenuClick('notes')}>
               <Icon name="description" /><span>Мои заметки</span>
             </button> 
-            
-            <button className="dropdown-item" onClick={() => handleMenuClick('subsList')}>
-                <Icon name="checklist_rtl" />
-                <span>Список подписок</span>
-            </button>
 
             <button className="dropdown-item" onClick={() => handleMenuClick('addCourse')}>
               <Icon name="add_circle" /><span>Добавить курс</span>
@@ -503,6 +507,258 @@ function DropdownMenu({
         </div> 
     </>
   ); 
+}
+
+function TeacherMonitoringModal({ 
+  isOpen, 
+  onClose, 
+  teacherSchedule, 
+  initialDate
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  teacherSchedule: Schedule | null; 
+  initialDate: Date;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [groupsData, setGroupsData] = useState<Record<string, Lesson[]>>({});
+  const [viewDate, setViewDate] = useState(initialDate);
+
+  const uniqueGroups = useMemo(() => {
+    if (!teacherSchedule) return [];
+    const groups = new Set<string>();
+    teacherSchedule.weeks.forEach(week => {
+      week.days.forEach(day => {
+        day.lessons.forEach(lesson => {
+          if (lesson.commonLesson?.group) groups.add(lesson.commonLesson.group);
+          if (lesson.subgroupedLesson?.subgroups) {
+            lesson.subgroupedLesson.subgroups.forEach(s => {
+              if (s.group) groups.add(s.group);
+            });
+          }
+        });
+      });
+    });
+    return Array.from(groups).sort();
+  }, [teacherSchedule]);
+
+  const loadMonitoringData = useCallback(async () => {
+    setLoading(true);
+    const results: Record<string, Lesson[]> = {};
+    const formattedDate = format(viewDate, 'yyyy-MM-dd');
+    const targetDayIdx = getDayIndex(viewDate);
+    const currentWeekNum = getWeekNumber(viewDate);
+
+    try {
+      await Promise.all(uniqueGroups.map(async (groupName) => {
+        try {
+          const data = await scheduleApi.getInfo(groupName, formattedDate, 0, "");
+          if (data.schedule) {
+            const weekData = data.schedule.weeks[currentWeekNum % 2];
+            results[groupName] = weekData?.days[targetDayIdx]?.lessons || [];
+          }
+        } catch (err) {
+          results[groupName] = [];
+        }
+      }));
+      setGroupsData(results);
+    } finally {
+      setLoading(false);
+    }
+  }, [uniqueGroups, viewDate]);
+
+  useEffect(() => {
+    if (isOpen && uniqueGroups.length > 0) {
+      loadMonitoringData();
+    }
+  }, [isOpen, uniqueGroups, loadMonitoringData]);
+
+  const handleDayShift = (direction: 'prev' | 'next') => {
+    let nextDate = direction === 'next' ? addDays(viewDate, 1) : subDays(viewDate, 1);
+    const day = getDay(nextDate);
+    
+    if (day === 0) nextDate = direction === 'next' ? addDays(nextDate, 1) : subDays(nextDate, 2);
+    if (day === 6) nextDate = direction === 'next' ? addDays(nextDate, 2) : subDays(nextDate, 1);
+    
+    setViewDate(nextDate);
+  };
+
+  if (!isOpen) return null;
+
+  const lessonSlots = [0, 1, 2, 3, 4];
+
+  return createPortal(
+    <div className="monitoring-overlay" onClick={onClose}>
+      <div className="monitoring-card" onClick={e => e.stopPropagation()}>
+        <div className="monitoring-header">
+          <div className="monitoring-nav">
+             <button onClick={() => handleDayShift('prev')} className="nav-arrow active"><Icon name="chevron_left" /></button>
+             <div className="nav-title">
+               <h3>Занятость групп</h3>
+               <p>{format(viewDate, 'd MMMM, EEEE', { locale: ru })}</p>
+             </div>
+             <button onClick={() => handleDayShift('next')} className="nav-arrow active"><Icon name="chevron_right" /></button>
+          </div>
+        </div>
+
+        <div className="monitoring-body">
+          {loading ? (
+            <div className="monitoring-loader">Загрузка данных групп...</div>
+          ) : (
+            <div className="monitoring-table-wrapper">
+              <table className="monitoring-table">
+                <thead>
+                  <tr>
+                    <th className="sticky-header">ГРУППА</th>
+                    {lessonSlots.map(n => <th key={n} className="sticky-header">{n + 1}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {uniqueGroups.map(group => (
+                    <tr key={group}>
+                      <td className="group-name-cell">{group}</td>
+                      {lessonSlots.map((idx) => {
+                        const lessons = groupsData[group] || [];
+                        const lesson = lessons[idx];
+                        const isFree = !lesson || lesson.noLesson || (Object.keys(lesson).length === 1 && lesson.noLesson);
+                        return (
+                          <td key={idx} className={`slot-cell ${isFree ? 'free' : 'busy'}`}>
+                            {isFree ? 'Окно' : 'Пара'}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        
+        <button className="monitoring-close-btn" onClick={onClose}>Вернуться</button>
+      </div>
+
+      <style>{`
+        .monitoring-overlay {
+          position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+          background: rgba(0,0,0,0.85); backdrop-filter: blur(14px);
+          z-index: 100000; display: flex; align-items: center; justify-content: center; padding: 16px;
+          animation: mFadeIn 0.3s ease;
+        }
+        @keyframes mFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .monitoring-card {
+          background: var(--color-surface, #1c1c1e);
+          width: 100%; max-width: 850px; border-radius: 36px;
+          padding: 32px; color: var(--color-text, #fff); border: 1px solid rgba(255,255,255,0.1);
+          box-shadow: 0 40px 100px rgba(0,0,0,0.6);
+          display: flex; flex-direction: column; max-height: 90vh;
+        }
+
+        .monitoring-header { margin-bottom: 30px; flex-shrink: 0; }
+        .monitoring-nav { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 20px; }
+        
+        .nav-arrow.active { 
+          background: var(--color-primary, #8c67f6) !important; 
+          color: #fff !important; 
+          border-radius: 16px; 
+          width: 58px; 
+          height: 58px; 
+          display: flex; 
+          align-items: center; 
+          justify-content: center; 
+          cursor: pointer; 
+          border: none;
+          box-shadow: 0 8px 25px rgba(140, 103, 246, 0.5);
+          transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+          opacity: 1 !important;
+          z-index: 5;
+        }
+        .nav-arrow.active:active { transform: scale(0.9) rotate(-5deg); }
+        .nav-arrow.active .material-icons { font-size: 36px !important; color: #fff !important; }
+
+        .nav-title { text-align: center; flex: 1; }
+        .nav-title h3 { margin: 0; font-weight: 950; font-size: 32px; letter-spacing: -1px; color: var(--color-text); }
+        .nav-title p { opacity: 0.6; margin: 8px 0 0 0; text-transform: capitalize; font-weight: 800; font-size: 17px; color: var(--color-text); }
+        
+        .monitoring-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 300px; }
+        
+        .monitoring-table-wrapper { 
+          overflow-y: auto; 
+          overflow-x: auto;
+          margin-bottom: 25px; 
+          border-radius: 20px; 
+          background: rgba(255,255,255,0.02); 
+          border: 1px solid rgba(255,255,255,0.05); 
+          flex: 1;
+          scrollbar-width: thin;
+          scrollbar-color: var(--color-primary) transparent;
+        }
+        
+        .monitoring-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 600px; }
+        
+        .sticky-header {
+          position: sticky;
+          top: 0;
+          z-index: 10;
+          background: var(--color-surface, #1c1c1e);
+          padding: 24px !important;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+          color: var(--color-primary, #8c67f6) !important; 
+          font-weight: 950 !important; 
+          font-size: 20px !important; 
+          text-transform: uppercase;
+          border-bottom: 2px solid rgba(255,255,255,0.1);
+        }
+        
+        .monitoring-table td { 
+          padding: 22px; 
+          text-align: center; 
+          border-bottom: 1px solid rgba(255,255,255,0.04); 
+          border-right: 1px solid rgba(255,255,255,0.04);
+        }
+        
+        .group-name-cell { 
+          text-align: center !important; 
+          font-weight: 900; 
+          font-size: 19px; 
+          background: rgba(255,255,255,0.05); 
+          color: var(--color-text);
+          min-width: 130px;
+        }
+        
+        .slot-cell { font-size: 12px; font-weight: 950; text-transform: uppercase; letter-spacing: 1px; }
+        .slot-cell.free { color: #4cd964; background: rgba(76, 217, 100, 0.12); }
+        .slot-cell.busy { color: rgba(255,255,255,0.1); font-weight: 700; }
+        
+        .monitoring-close-btn {
+          width: 100%; padding: 20px; border-radius: 24px; border: none;
+          background: var(--color-primary, #8c67f6); color: white; font-weight: 900; cursor: pointer;
+          font-size: 17px; transition: all 0.2s; box-shadow: 0 6px 25px rgba(140, 103, 246, 0.4);
+          flex-shrink: 0;
+        }
+        .monitoring-close-btn:active { transform: translateY(2px); box-shadow: none; }
+        .monitoring-loader { padding: 120px 0; text-align: center; font-weight: 900; opacity: 0.5; font-size: 20px; }
+
+        @media (prefers-color-scheme: light) {
+          .monitoring-overlay { background: rgba(0,0,0,0.5); }
+          .monitoring-card { background: #ffffff; border-color: rgba(0,0,0,0.1); box-shadow: 0 40px 100px rgba(0,0,0,0.2); color: #000; }
+          .monitoring-table-wrapper { background: #f8f9fa; border-color: rgba(0,0,0,0.08); }
+          .sticky-header { background: #ffffff; color: #8c67f6 !important; border-bottom: 3px solid #eee; box-shadow: 0 2px 8px rgba(0,0,0,0.08); font-size: 20px !important; }
+          .group-name-cell { background: #f2f2f7; color: #000; font-size: 19px; }
+          .slot-cell.busy { color: rgba(0,0,0,0.18); background: #fafafa; }
+          .slot-cell.free { background: rgba(76, 217, 100, 0.18); color: #1e7e34; }
+          .monitoring-table td { border-color: #eee; }
+          .nav-arrow.active { box-shadow: 0 8px 20px rgba(140, 103, 246, 0.4); }
+          .nav-title h3, .nav-title p { color: #000; }
+          .monitoring-close-btn { box-shadow: 0 6px 20px rgba(140, 103, 246, 0.3); }
+        }
+
+        .container { position: relative; }
+      `}</style>
+    </div>,
+    document.body
+  );
 }
 
 function processSubgroupedOverride(originalLesson: Lesson, overrideWillBe: Lesson): Lesson {
@@ -628,7 +884,7 @@ export function ScheduleScreen() {
   const [isPracticeModalOpen, setIsPracticeModalOpen] = useState(false);
   const [isAllEventsModalOpen, setIsAllEventsModalOpen] = useState(false); 
   const [isRateModalOpen, setIsRateModalOpen] = useState(false); 
-  const [isSubsListOpen, setIsSubsListOpen] = useState(false);
+  const [isMonitoringOpen, setIsMonitoringOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false); 
   const [isRateSubmitting, setIsRateSubmitting] = useState(false);
   
@@ -1284,6 +1540,122 @@ export function ScheduleScreen() {
         .snackbar-title { font-weight: 800; font-size: 14px; margin-bottom: 2px; }
         .snackbar-message { font-size: 12px; opacity: 0.8; line-height: 1.3; }
         .snackbar-btn { padding: 8px 14px; background: rgba(255,255,255,0.15); border: none; border-radius: 14px; color: inherit; font-weight: 700; font-size: 12px; cursor: pointer; }
+
+        .monitoring-overlay {
+          position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+          background: rgba(0,0,0,0.85); backdrop-filter: blur(14px);
+          z-index: 100000; display: flex; align-items: center; justify-content: center; padding: 16px;
+          animation: mFadeIn 0.3s ease;
+        }
+        @keyframes mFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .monitoring-card {
+          background: var(--color-surface, #1c1c1e);
+          width: 100%; max-width: 850px; border-radius: 36px;
+          padding: 32px; color: var(--color-text, #fff); border: 1px solid rgba(255,255,255,0.1);
+          box-shadow: 0 40px 100px rgba(0,0,0,0.6);
+          display: flex; flex-direction: column; max-height: 90vh;
+        }
+
+        .monitoring-header { margin-bottom: 30px; flex-shrink: 0; }
+        .monitoring-nav { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 20px; }
+        
+        .nav-arrow.active { 
+          background: var(--color-primary, #8c67f6) !important; 
+          color: #fff !important; 
+          border-radius: 16px; 
+          width: 58px; 
+          height: 58px; 
+          display: flex; 
+          align-items: center; 
+          justify-content: center; 
+          cursor: pointer; 
+          border: none;
+          box-shadow: 0 8px 25px rgba(140, 103, 246, 0.5);
+          transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+          opacity: 1 !important;
+          z-index: 5;
+        }
+        .nav-arrow.active:active { transform: scale(0.9) rotate(-5deg); }
+        .nav-arrow.active .material-icons { font-size: 36px !important; color: #fff !important; }
+
+        .nav-title { text-align: center; flex: 1; }
+        .nav-title h3 { margin: 0; font-weight: 950; font-size: 32px; letter-spacing: -1px; color: var(--color-text); }
+        .nav-title p { opacity: 0.6; margin: 8px 0 0 0; text-transform: capitalize; font-weight: 800; font-size: 17px; color: var(--color-text); }
+        
+        .monitoring-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 300px; }
+        
+        .monitoring-table-wrapper { 
+          overflow-y: auto; 
+          overflow-x: auto;
+          margin-bottom: 25px; 
+          border-radius: 20px; 
+          background: rgba(255,255,255,0.02); 
+          border: 1px solid rgba(255,255,255,0.05); 
+          flex: 1;
+          scrollbar-width: thin;
+          scrollbar-color: var(--color-primary) transparent;
+        }
+        
+        .monitoring-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 600px; }
+        
+        .sticky-header {
+          position: sticky;
+          top: 0;
+          z-index: 10;
+          background: var(--color-surface, #1c1c1e);
+          padding: 24px !important;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+          color: var(--color-primary, #8c67f6) !important; 
+          font-weight: 950 !important; 
+          font-size: 20px !important; 
+          text-transform: uppercase;
+          border-bottom: 2px solid rgba(255,255,255,0.1);
+        }
+        
+        .monitoring-table td { 
+          padding: 22px; 
+          text-align: center; 
+          border-bottom: 1px solid rgba(255,255,255,0.04); 
+          border-right: 1px solid rgba(255,255,255,0.04);
+        }
+        
+        .group-name-cell { 
+          text-align: center !important; 
+          font-weight: 900; 
+          font-size: 19px; 
+          background: rgba(255,255,255,0.05); 
+          color: var(--color-text);
+          min-width: 130px;
+        }
+        
+        .slot-cell { font-size: 12px; font-weight: 950; text-transform: uppercase; letter-spacing: 1px; }
+        .slot-cell.free { color: #4cd964; background: rgba(76, 217, 100, 0.12); }
+        .slot-cell.busy { color: rgba(255,255,255,0.1); font-weight: 700; }
+        
+        .monitoring-close-btn {
+          width: 100%; padding: 20px; border-radius: 24px; border: none;
+          background: var(--color-primary, #8c67f6); color: white; font-weight: 900; cursor: pointer;
+          font-size: 17px; transition: all 0.2s; box-shadow: 0 6px 25px rgba(140, 103, 246, 0.4);
+          flex-shrink: 0;
+        }
+        .monitoring-close-btn:active { transform: translateY(2px); box-shadow: none; }
+        .monitoring-loader { padding: 120px 0; text-align: center; font-weight: 900; opacity: 0.5; font-size: 20px; }
+
+        @media (prefers-color-scheme: light) {
+          .monitoring-overlay { background: rgba(0,0,0,0.5); }
+          .monitoring-card { background: #ffffff; border-color: rgba(0,0,0,0.1); box-shadow: 0 40px 100px rgba(0,0,0,0.2); color: #000; }
+          .monitoring-table-wrapper { background: #f8f9fa; border-color: rgba(0,0,0,0.08); }
+          .sticky-header { background: #ffffff; color: #8c67f6 !important; border-bottom: 3px solid #eee; box-shadow: 0 2px 8px rgba(0,0,0,0.08); font-size: 20px !important; }
+          .group-name-cell { background: #f2f2f7; color: #000; font-size: 19px; }
+          .slot-cell.busy { color: rgba(0,0,0,0.18); background: #fafafa; }
+          .slot-cell.free { background: rgba(76, 217, 100, 0.18); color: #1e7e34; }
+          .monitoring-table td { border-color: #eee; }
+          .nav-arrow.active { box-shadow: 0 8px 20px rgba(140, 103, 246, 0.4); }
+          .nav-title h3, .nav-title p { color: #000; }
+          .monitoring-close-btn { box-shadow: 0 6px 20px rgba(140, 103, 246, 0.3); }
+        }
+
         .container { position: relative; }
       `}</style>
       <div className="container" style={{ fontFamily: 'Inter, sans-serif' }}>
@@ -1304,8 +1676,9 @@ export function ScheduleScreen() {
                   onStartTour={startTour} 
                   onRateApp={handleRateOpen} 
                   onAddCourse={() => setIsAddCourseOpen(true)} 
-                  onOpenSubsList={() => setIsSubsListOpen(true)}
                   onSupport={() => window.open('https://t.me/ttgtapps', '_blank')}
+                  isTeacher={isTeacherView}
+                  onOpenMonitoring={() => setIsMonitoringOpen(true)}
               />
           </div>
         </div>
@@ -1378,14 +1751,20 @@ export function ScheduleScreen() {
         <CustomCalendar isOpen={isCalendarOpen} onClose={() => setIsCalendarOpen(false)} onSelectDate={handleDateSelect} currentDate={selectedDate} calendarEvents={calendarEvents} />
         <NoteModal lesson={lessonToEdit} onClose={() => setEditingLessonIndex(null)} onSave={handleSaveNote} savedNote={currentLessonData.notes} savedSubgroup={currentLessonData.subgroup} />
         
-        <ActiveSubscriptionsModal isOpen={isSubsListOpen} onClose={() => setIsSubsListOpen(false)} />
-        <SupportModal isOpen={isSupportOpen} onClose={() => setIsSupportOpen(false)} onSubmit={handleSupportSubmit} isLoading={isSupportLoading} />
-        
-        <Snackbar message={snackbarMessage || ''} isVisible={showSnackbar} onClose={() => { setShowSnackbar(false); setSnackbarLink(null); }} link={snackbarLink} linkText={snackbarLinkText} />
         <HistoryModal isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} history={history} isTeacherView={isTeacherView} />
         <AllNotesModal isOpen={isNotesModalOpen} onClose={() => setIsNotesModalOpen(false)} profileId={currentProfileId} schedule={fullSchedule} />
         <AllEventsModal isOpen={isAllEventsModalOpen} onClose={() => setIsAllEventsModalOpen(false)} calendarEvents={calendarEvents} onNavigateToDate={handleNavigateToDate} groupName={appState.profiles.student?.name} />
         <RateModal isOpen={isRateModalOpen} onClose={() => setIsRateModalOpen(false)} onSubmit={handleRateSubmit} />
+        
+        <TeacherMonitoringModal 
+          isOpen={isMonitoringOpen} 
+          onClose={() => setIsMonitoringOpen(false)} 
+          teacherSchedule={fullSchedule} 
+          initialDate={selectedDate}
+        />
+
+        <Snackbar message={snackbarMessage || ''} isVisible={showSnackbar} onClose={() => { setShowSnackbar(false); setSnackbarLink(null); }} link={snackbarLink} linkText={snackbarLinkText} />
+
         <div id="tour-nav-panel" className="week-switcher-container">
           <button className="back-button" onClick={() => navigate('/')} title="Назад"><Icon name="arrow_back" /></button>
           <button className="week-switcher-button" onClick={handleWeekSwitch}>
