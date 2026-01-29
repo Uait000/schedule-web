@@ -1,17 +1,3 @@
-// src/screens/Schedule.tsx
-/**
- * ============================================================================
- * ТТЖТ РАСПИСАНИЕ - SCHEDULE SCREEN (v2.9.2-ultra-fix)
- * ============================================================================
- * Разработчик: Gemini (AI Technical Lead)
- * * КРИТИЧЕСКИЕ ОБНОВЛЕНИЯ:
- * 1. [TEACHER AUTO-LOAD FIX]: Замены у преподавателя теперь работают СРАЗУ.
- * 2. [CROSS-PROFILE SYNC]: Мгновенный поиск фамилии по всем кэшированным группам.
- * 3. [NATIVE CACHE FIX]: Программная разрегистрация Service Worker для PWA.
- * 4. [SUBGROUP LOGIC]: Корректная работа Л-1-2 (слияние) и Д-1-1 (фильтрация).
- * ============================================================================
- */
-
 import { useNavigate } from 'react-router-dom';
 import ScheduleItem, { isLessonCurrent } from '../components/ScheduleItem';
 import { NoteModal } from '../components/NoteModal';
@@ -54,10 +40,6 @@ import { findNextPractice, findUpcomingEvent, PracticeInfo } from '../utils/prac
 import { ActiveSubscriptionsModal } from '../components/ActiveSubscriptionsModal'; 
 import { SupportModal } from '../components/SupportModal'; 
 
-/**
- * 🔥 ВЕРСИЯ ПРИЛОЖЕНИЯ (МЕНЯТЬ ПРИ КАЖДОМ ДЕПЛОЕ)
- * Текущая версия: 2.9.2
- */
 const CURRENT_APP_VERSION = '2.9.2';
 
 interface LessonData {
@@ -66,22 +48,22 @@ interface LessonData {
   lastUpdated?: number;
 }
 
-const DAYS_OF_WEEK = [ 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница' ];
+const DAYS_OF_WEEK = [ 
+  'Понедельник', 
+  'Вторник', 
+  'Среда', 
+  'Четверг', 
+  'Пятница' 
+];
 
-/**
- * Глобальный перехватчик ошибок ресурсов (404 Assets Recovery)
- */
 if (typeof window !== 'undefined') {
   window.addEventListener('error', async (e) => {
     const target = e.target as any;
     if (target && target.tagName === 'SCRIPT' && target.src && target.src.includes('/assets/')) {
-      console.warn('Критическая ошибка ресурсов. Запуск принудительного восстановления...');
-      
       if ('caches' in window) {
         const cacheNames = await caches.keys();
         await Promise.all(cacheNames.map(name => caches.delete(name)));
       }
-      
       window.location.reload();
     }
   }, true);
@@ -179,7 +161,15 @@ export function normalizeLesson(lesson: any): Lesson {
     if (!obj) return undefined;
     if (typeof obj === 'string') return obj; 
     if (typeof obj !== 'object') return undefined;
-    const candidates = ['group', 'Group', 'studentGroup', 'StudentGroup', 'className', 'targetGroup', 'target'];
+    const candidates = [
+      'group', 
+      'Group', 
+      'studentGroup', 
+      'StudentGroup', 
+      'className', 
+      'targetGroup', 
+      'target'
+    ];
     for (const key of candidates) {
         const val = obj[key];
         if (val) {
@@ -259,34 +249,17 @@ function saveLessonData(profileId: string, week: number, day: number, lesson: nu
 }
 
 const Icon = ({ name, style = {}, className = '' }: { name: string; style?: React.CSSProperties, className?: string }) => (
-  <span className={`material-icons ${className}`} style={{ fontSize: 'inherit', verticalAlign: 'middle', ...style }}>{name}</span>
+  <span 
+    className={`material-icons ${className}`} 
+    style={{ 
+      fontSize: 'inherit', 
+      verticalAlign: 'middle', 
+      ...style 
+    }}
+  >
+    {name}
+  </span>
 );
-
-function FloatingNotificationBanner({ isEnabled, onToggle, isSupported, onClose }: { isEnabled: boolean; onToggle: () => void; isSupported: boolean; onClose: () => void }) {
-    if (!isSupported) return null;
-    
-    return (
-        <div className="floating-notification-banner">
-            <div className="notif-content">
-                <div className="notif-icon-box">
-                    <Icon name={isEnabled ? "notifications_active" : "notifications_off"} className="gradient-icon" style={{ fontSize: '26px' }} />
-                </div>
-                <div className="notif-text">
-                    <span className="notif-title">{isEnabled ? 'Уведомления активны' : 'Включить уведомления?'}</span>
-                    <span className="notif-desc">{isEnabled ? 'Вы получаете оповещения о заменах' : 'Не пропускайте важные изменения'}</span>
-                </div>
-            </div>
-            <div className="notif-actions">
-                <button className={`notif-btn ${isEnabled ? 'secondary' : 'primary'}`} onClick={onToggle}>
-                    {isEnabled ? 'Выкл' : 'Вкл'}
-                </button>
-                <button className="notif-close-btn" onClick={onClose}>
-                    <Icon name="close" />
-                </button>
-            </div>
-        </div>
-    );
-}
 
 function CustomCalendar({ isOpen, onClose, onSelectDate, currentDate, calendarEvents }: { isOpen: boolean; onClose: () => void; onSelectDate: (date: Date) => void; currentDate: Date; calendarEvents: CalendarEvent[]; }) { 
   const [viewDate, setViewDate] = useState(currentDate); 
@@ -439,8 +412,6 @@ function DropdownMenu({
   onOpenAllEvents,
   onStartTour,
   onRateApp,
-  onSubscribePush,
-  isPushEnabled,
   onOpenSubsList, 
   onSupport 
 }: { 
@@ -454,8 +425,6 @@ function DropdownMenu({
   onOpenAllEvents: () => void;
   onStartTour: () => void;
   onRateApp: () => void; 
-  onSubscribePush: () => void;
-  isPushEnabled: boolean; 
   onOpenSubsList: () => void; 
   onSupport: () => void;
 }) { 
@@ -475,7 +444,6 @@ function DropdownMenu({
     else if (action === 'subsList') { onOpenSubsList(); } 
     else if (action === 'support') { onSupport(); } 
     else if (action === 'rate') { onRateApp(); } 
-    else if (action === 'push') { onSubscribePush(); } 
     else if (action === 'changeGroup') { 
       localStorage.removeItem('selectedId'); 
       localStorage.removeItem('userType'); 
@@ -487,26 +455,46 @@ function DropdownMenu({
     <>
         <div className="dropdown-overlay" onClick={onClose} />
         <div className="dropdown-menu-attached" onClick={(e) => e.stopPropagation()}> 
-            <button className="dropdown-item" onClick={() => handleMenuClick('overrides')}><Icon name="sync_alt" /><span>Проверить изменения</span></button> 
-            <button className="dropdown-item" onClick={() => handleMenuClick('allEvents')}><Icon name="event_repeat" /><span>График событий</span></button> 
-            <button className="dropdown-item" onClick={() => handleMenuClick('history')}><Icon name="history" /><span>История замен</span></button> 
-            <button className="dropdown-item" onClick={() => handleMenuClick('notes')}><Icon name="description" /><span>Мои заметки</span></button> 
+            <button className="dropdown-item" onClick={() => handleMenuClick('overrides')}>
+              <Icon name="sync_alt" /><span>Проверить изменения</span>
+            </button> 
+
+            <button className="dropdown-item" onClick={() => handleMenuClick('allEvents')}>
+              <Icon name="event_repeat" /><span>График событий</span>
+            </button> 
+
+            <button className="dropdown-item" onClick={() => handleMenuClick('history')}>
+              <Icon name="history" /><span>История замен</span>
+            </button> 
+
+            <button className="dropdown-item" onClick={() => handleMenuClick('notes')}>
+              <Icon name="description" /><span>Мои заметки</span>
+            </button> 
             
             <button className="dropdown-item" onClick={() => handleMenuClick('subsList')}>
                 <Icon name="checklist_rtl" />
                 <span>Список подписок</span>
             </button>
 
-            <button className="dropdown-item" onClick={() => handleMenuClick('push')}>
-                <Icon name={isPushEnabled ? "notifications_active" : "notifications"} />
-                <span>{isPushEnabled ? 'Выключить пуши' : 'Включить пуши'}</span>
-            </button>
+            <button className="dropdown-item" onClick={() => handleMenuClick('addCourse')}>
+              <Icon name="add_circle" /><span>Добавить курс</span>
+            </button> 
 
-            <button className="dropdown-item" onClick={() => handleMenuClick('addCourse')}><Icon name="add_circle" /><span>Добавить курс</span></button> 
-            <button className="dropdown-item" onClick={() => handleMenuClick('install')}><Icon name="download" /><span>Установить приложение</span></button> 
-            <button className="dropdown-item" onClick={() => handleMenuClick('rate')}><Icon name="star_outline" /><span>Оценить приложение</span></button> 
-            <button className="dropdown-item" onClick={() => handleMenuClick('changeGroup')}><Icon name="group" /><span>Поменять группу</span></button> 
-            <button className="dropdown-item" onClick={() => handleMenuClick('help')}><Icon name="help_outline" /><span>Как пользоваться?</span></button>
+            <button className="dropdown-item" onClick={() => handleMenuClick('install')}>
+              <Icon name="download" /><span>Установить приложение</span>
+            </button> 
+
+            <button className="dropdown-item" onClick={() => handleMenuClick('rate')}>
+              <Icon name="star_outline" /><span>Оценить приложение</span>
+            </button> 
+
+            <button className="dropdown-item" onClick={() => handleMenuClick('changeGroup')}>
+              <Icon name="group" /><span>Поменять группу</span>
+            </button> 
+
+            <button className="dropdown-item" onClick={() => handleMenuClick('help')}>
+              <Icon name="help_outline" /><span>Как пользоваться?</span>
+            </button>
             
             <button className="dropdown-item" onClick={() => handleMenuClick('support')}>
               <Icon name="contact_support" />
@@ -642,11 +630,8 @@ export function ScheduleScreen() {
   const [isRateModalOpen, setIsRateModalOpen] = useState(false); 
   const [isSubsListOpen, setIsSubsListOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false); 
+  const [isRateSubmitting, setIsRateSubmitting] = useState(false);
   
-  const [isPushEnabled, setIsPushEnabled] = useState(false);
-  const [isPushSupported, setIsPushSupported] = useState(true);
-  const [showPushBanner, setShowPushBanner] = useState(false); 
-
   const currentProfileId = localStorage.getItem('selectedId') || 'default';
   const isTeacherView = appState.lastUsed === ProfileType.TEACHER; 
    
@@ -669,8 +654,6 @@ export function ScheduleScreen() {
       const storedVersion = localStorage.getItem('app_purge_ver');
       
       if (storedVersion !== CURRENT_APP_VERSION) {
-        console.warn('⚡️ Нативное обновление: полная очистка...');
-        
         if ('caches' in window) {
           const names = await caches.keys();
           await Promise.all(names.map(n => caches.delete(n)));
@@ -710,63 +693,6 @@ export function ScheduleScreen() {
       setIsSupportLoading(false);
     }
   };
-
-  const checkSubscriptionStatus = useCallback(async () => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-        setIsPushSupported(false);
-        return;
-    }
-    const registration = await navigator.serviceWorker.ready;
-    const subscription = await registration.pushManager.getSubscription();
-    const active = localStorage.getItem(`push_active_${currentProfileId}`) === 'true';
-    const processed = localStorage.getItem(`push_banner_processed_${currentProfileId}`) === 'true';
-    setIsPushEnabled(active);
-    if (!active && !processed) { setShowPushBanner(true); } 
-    else { setShowPushBanner(false); }
-  }, [currentProfileId]);
-
-  useEffect(() => { checkSubscriptionStatus(); }, [checkSubscriptionStatus]);
-
-  const handlePushSubscription = async () => {
-    if (!isPushSupported) { showMessage("Браузер не поддерживает уведомления"); return; }
-    localStorage.setItem(`push_banner_processed_${currentProfileId}`, 'true');
-    setShowPushBanner(false);
-
-    if (isPushEnabled) {
-        setIsPushEnabled(false);
-        localStorage.setItem(`push_active_${currentProfileId}`, 'false');
-        try {
-            const reg = await navigator.serviceWorker.ready;
-            const sub = await reg.pushManager.getSubscription();
-            if (sub) { await scheduleApi.subscribePush(sub, currentProfileId, false); }
-        } catch (e) { console.error(e); }
-        showMessage("Отключено");
-        return;
-    }
-
-    try {
-      const reg = await navigator.serviceWorker.ready;
-      const perm = await Notification.requestPermission();
-      if (perm !== 'granted') {
-        showMessage("Разрешите пуши");
-        return;
-      }
-      let sub = await reg.pushManager.getSubscription();
-      if (!sub) {
-          const key = 'BIqO4RMd3S60fnef-Qx8ukxxZqTEsCyG-tvcvZAwyGef77_Nv0s56oxmuxSenjMH7nUsPoWb7xC7vyHVpWLZNPs';
-          sub = await reg.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(key)
-          });
-      }
-      await scheduleApi.subscribePush(sub, currentProfileId, true);
-      localStorage.setItem(`push_active_${currentProfileId}`, 'true');
-      setIsPushEnabled(true);
-      showMessage("Включено! 🔔");
-    } catch (err) { showMessage("Ошибка активации"); }
-  };
-
-  const closePushBanner = () => { localStorage.setItem(`push_banner_processed_${currentProfileId}`, 'true'); setShowPushBanner(false); };
 
   const handleNavigateToDate = useCallback((date: Date, message: string) => {
     setSelectedDate(date);
@@ -833,7 +759,6 @@ export function ScheduleScreen() {
         await dataStore.updateProfileMetadata(profileId, { scheduleUpdate: info.schedule_update || metadata.scheduleUpdate, eventsHash: info.events?.sha256 || metadata.eventsHash, events: events });
         await dataStore.updateData(s => ({ ...s, profiles: { ...s.profiles, [profileType === ProfileType.TEACHER ? 'teacher' : 'student']: { ...s.profiles[profileType === ProfileType.TEACHER ? 'teacher' : 'student'], id: profileId, schedule: info.schedule || fullSchedule, overrides: info.overrides || overrides } } }));
     } catch (err) { 
-        console.error("Load Error:", err); 
         if (!fullSchedule) setError('Ошибка сервера. Попробуйте позже.'); 
     } finally { setIsLoading(false); }
   }, [fullSchedule, overrides, addEntry]);
@@ -852,7 +777,6 @@ export function ScheduleScreen() {
       localStorage.setItem('selectedId', newProfile.id);
       localStorage.setItem('userType', newType);
       
-      // 🔥 ДЛЯ ПРЕПОДАВАТЕЛЯ: Сразу активируем замены при переключении
       if (newType === ProfileType.TEACHER) {
           setApplyOverrides(true);
       }
@@ -865,19 +789,56 @@ export function ScheduleScreen() {
   }, [isSwitchingProfile, loadProfileData, selectedDate, showMessage, setApplyOverrides]);
 
   const handleRateSubmit = async (stars: number, comment: string) => {
+    if (isRateSubmitting) return;
+    if (!comment || comment.trim().length === 0) {
+      showMessage("Пожалуйста, напишите текст отзыва... Мы ценим обратную связь! ✍️");
+      return; 
+    }
+    if (localStorage.getItem('app_rated') === 'true') {
+        setIsRateModalOpen(false);
+        showMessage("Вы уже оценивали приложение! ✨");
+        return;
+    }
+    
+    setIsRateSubmitting(true);
     try {
-      const payload = { stars: Number(stars), comment: String(comment || ""), teacher: isTeacherView ? (appState.profiles.teacher?.name || "N/A") : null, group: appState.profiles.student?.name || "N/A", platform: 'web-ttgt-app' };
+      const payload = { 
+        stars: Number(stars), 
+        comment: String(comment || ""), 
+        teacher: isTeacherView ? (appState.profiles.teacher?.name || "N/A") : null, 
+        group: appState.profiles.student?.name || "N/A", 
+        platform: 'web-ttgt-app' 
+      };
+      
       await scheduleApi.postRate(payload);
       localStorage.setItem('app_rated', 'true'); 
       setIsRateModalOpen(false);
-      showMessage("Спасибо! ❤️");
-    } catch(e) { showMessage("Спасибо! ❤️"); }
+      showMessage("Спасибо! Мы получили ваш отзыв ❤️");
+    } catch(e) { 
+      localStorage.setItem('app_rated', 'true'); 
+      setIsRateModalOpen(false);
+      showMessage("Спасибо! ❤️"); 
+    } finally {
+      setIsRateSubmitting(false);
+    }
+  };
+
+  const handleRateOpen = () => {
+    const isAlreadyRated = localStorage.getItem('app_rated') === 'true';
+    if (isAlreadyRated) {
+      showMessage("Вы уже оценивали наше приложение. Спасибо за поддержку! ✨");
+    } else {
+      setIsRateModalOpen(true);
+    }
   };
 
   useEffect(() => {
     const launch = localStorage.getItem('app_first_launch');
-    if (!launch) { localStorage.setItem('app_first_launch', Date.now().toString()); } 
-    else if (Date.now() - parseInt(launch) > 7*24*60*60*1000 && !localStorage.getItem('app_rated')) {
+    const alreadyRated = localStorage.getItem('app_rated') === 'true';
+    if (!launch) { 
+        localStorage.setItem('app_first_launch', Date.now().toString()); 
+    } 
+    else if (!alreadyRated && Date.now() - parseInt(launch) > 7*24*60*60*1000) {
       setTimeout(() => setIsRateModalOpen(true), 3000);
     }
   }, []);
@@ -912,14 +873,32 @@ export function ScheduleScreen() {
     }
   }, []);
 
-  useEffect(() => { const timer = setTimeout(() => { scrollToActiveDay(activeDayIndex); }, 100); return () => clearTimeout(timer); }, [activeDayIndex, scrollToActiveDay]);
+  useEffect(() => { 
+    const timer = setTimeout(() => { scrollToActiveDay(activeDayIndex); }, 100); 
+    return () => clearTimeout(timer); 
+  }, [activeDayIndex, scrollToActiveDay]);
 
-  useEffect(() => { const unsubscribe = dataStore.subscribe((newState) => { setAppState(newState); setDataVersion(v => v + 1); }); return () => unsubscribe(); }, []);
+  useEffect(() => { 
+    const unsubscribe = dataStore.subscribe((newState) => { 
+      setAppState(newState); 
+      setDataVersion(v => v + 1); 
+    }); 
+    return () => unsubscribe(); 
+  }, []);
 
-  const handleAddProfile = useCallback(() => { navigate('/', { state: { fromAddProfile: true } }); }, [navigate]);
+  const handleAddProfile = useCallback(() => { 
+    navigate('/', { state: { fromAddProfile: true } }); 
+  }, [navigate]);
 
-  const handleTouchStart = (e: React.TouchEvent) => { setTouchStart(e.targetTouches[0].clientX); setSwipeLimitReached(false); };
-  const handleTouchMove = (e: React.TouchEvent) => { setTouchEnd(e.targetTouches[0].clientX); };
+  const handleTouchStart = (e: React.TouchEvent) => { 
+    setTouchStart(e.targetTouches[0].clientX); 
+    setSwipeLimitReached(false); 
+  };
+  
+  const handleTouchMove = (e: React.TouchEvent) => { 
+    setTouchEnd(e.targetTouches[0].clientX); 
+  };
+  
   const handleTouchEnd = useCallback(() => {
     if (!touchStart || !touchEnd || isAnimating) return;
     const distance = touchStart - touchEnd;
@@ -929,7 +908,10 @@ export function ScheduleScreen() {
         if (newIndex > 4 || newIndex < 0) {
             setSwipeLimitReached(true);
             scheduleListRef.current?.classList.add('swipe-limit');
-            setTimeout(() => { scheduleListRef.current?.classList.remove('swipe-limit'); setIsAnimating(false); }, 500);
+            setTimeout(() => { 
+              scheduleListRef.current?.classList.remove('swipe-limit'); 
+              setIsAnimating(false); 
+            }, 500);
             return;
         }
         scheduleListRef.current?.classList.add(distance > 0 ? 'slide-left' : 'slide-right');
@@ -937,7 +919,10 @@ export function ScheduleScreen() {
               setActiveDayIndex(newIndex);
               const currentMonday = startOfWeek(selectedDate, { weekStartsOn: 1 });
               setSelectedDate(addDays(currentMonday, newIndex));
-              setTimeout(() => { scheduleListRef.current?.classList.remove('slide-left', 'slide-right'); setIsAnimating(false); }, 300);
+              setTimeout(() => { 
+                scheduleListRef.current?.classList.remove('slide-left', 'slide-right'); 
+                setIsAnimating(false); 
+              }, 300);
         }, 150);
     }
     setTouchStart(null); setTouchEnd(null);
@@ -951,7 +936,10 @@ export function ScheduleScreen() {
           setActiveDayIndex(newIndex);
           const currentMonday = startOfWeek(selectedDate, { weekStartsOn: 1 });
           setSelectedDate(addDays(currentMonday, newIndex));
-          setTimeout(() => { scheduleListRef.current?.classList.remove('slide-left', 'slide-right'); setIsAnimating(false); }, 300);
+          setTimeout(() => { 
+            scheduleListRef.current?.classList.remove('slide-left', 'slide-right'); 
+            setIsAnimating(false); 
+          }, 300);
       }, 150);
   };
 
@@ -977,8 +965,12 @@ export function ScheduleScreen() {
   const toggleApplyOverrides = () => {
     const newValue = !applyOverrides;
     setApplyOverrides(newValue);
-    if (newValue && (overrides?.overrides?.length || 0) > 0) { showMessage('Замены применены'); } 
-    else if (!newValue) { showMessage('Исходное расписание'); }
+    if (newValue && (overrides?.overrides?.length || 0) > 0) { 
+      showMessage('Замены применены'); 
+    } 
+    else if (!newValue) { 
+      showMessage('Исходное расписание'); 
+    }
   };
 
   const handleSubgroupChange = (lessonIndex: number, subgroup: number) => {
@@ -1012,7 +1004,6 @@ export function ScheduleScreen() {
       if (!selectedId) { navigate('/'); return; }
       if (userType && userType !== appState.lastUsed) { await dataStore.setLastUsed(userType); }
       
-      // 🔥 ДЛЯ ПРЕПОДАВАТЕЛЯ: При заходе СРАЗУ включаем режим замен
       if (userType === ProfileType.TEACHER) {
           setApplyOverrides(true);
       }
@@ -1030,9 +1021,6 @@ export function ScheduleScreen() {
     }
   }, [selectedDateTime, currentProfileId, loadProfileData]);
 
-  /**
-   * 🔥 УЛУЧШЕННАЯ ЛОГИКА ПРИМЕНЕНИЯ ЗАМЕН
-   */
   useEffect(() => {
     if (!fullSchedule) { setDisplaySchedule(null); return; }
     const newSchedule = JSON.parse(JSON.stringify(fullSchedule)) as Schedule;
@@ -1041,8 +1029,6 @@ export function ScheduleScreen() {
     
     const curDate = new Date(selectedDateTime);
     
-    // 🔥 Если преподаватель - замены должны искаться ВСЕГДА, но отображаться по флагу applyOverrides
-    // Мы не возвращаем schedule до наложения, если мы в Teacher View и есть хоть какие-то данные
     if (!applyOverrides) { setDisplaySchedule(newSchedule); return; }
     
     let effectiveOverrides: any[] = [];
@@ -1053,14 +1039,10 @@ export function ScheduleScreen() {
         substitutesDateMatches = overrides.day === curDate.getDate() && overrides.month === curDate.getMonth() && overrides.year === curDate.getFullYear();
     }
 
-    /**
-     * 🔥 АВТО-ПОИСК ДЛЯ ПРЕПОДАВАТЕЛЯ ПО ВСЕМ КЭШИРОВАННЫМ ПРОФИЛЯМ
-     */
     if (isTeacherView) {
         const teacherName = appState.profiles.teacher?.name || "";
         const teacherLastName = teacherName.split(' ')[0]; 
         
-        // Перебираем все профили (студентов) в appState
         Object.entries(appState.profiles).forEach(([key, profile]: [string, any]) => {
             if (!profile || profile.id === currentProfileId) return; 
             
@@ -1079,7 +1061,6 @@ export function ScheduleScreen() {
                                        subgroupTeachers.some(t => t.includes(teacherLastName));
                         
                         if (isRelevant) {
-                            // Проверяем, нет ли уже такой замены (по индексу)
                             if (!effectiveOverrides.some(o => o.index === stOv.index)) {
                                 const enrichedWillBe = JSON.parse(JSON.stringify(willBe));
                                 if (enrichedWillBe.commonLesson) { 
@@ -1151,7 +1132,7 @@ export function ScheduleScreen() {
       }
     }
     setDisplaySchedule(newSchedule);
-    setDataVersion(v => v + 1); // 🔥 Форсируем рендер списка
+    setDataVersion(v => v + 1);
   }, [fullSchedule, overrides, applyOverrides, calendarEvents, selectedDateTime, activeWeekIndex, activeDayIndex, isTeacherView, appState.profiles, currentProfileId]);
 
   const lessonsToShow = useMemo(() => {
@@ -1184,8 +1165,14 @@ export function ScheduleScreen() {
       const isCurrent = isLessonCurrent(index, activeDayIndex, isTuesday);
       const lessonData = getSavedLessonData(currentProfileId, activeWeekIndex, activeDayIndex, index);
       const customCourseId = lesson ? (lesson as any).customCourseId : undefined;
-      if (isTuesday && index === 3) { return ( <ScheduleItem key="class-hour" lesson={{ commonLesson: { name: 'Классный час', teacher: '', room: '', group: '' } }} index={index} isCurrent={isCurrent} isTuesday={true} isClassHour={true} onClick={() => {}} activeDayIndex={activeDayIndex} /> ); }
-      return ( <ScheduleItem key={customCourseId || index} lesson={lesson} index={index} isCurrent={isCurrent} isTuesday={isTuesday} hasNote={hasNoteForLesson(index)} onSubgroupChange={handleSubgroupChange} savedSubgroup={lessonData.subgroup} isTeacherView={isTeacherView} customCourseId={customCourseId} activeDayIndex={activeDayIndex} onClick={() => { if (lesson && !lesson.noLesson) setEditingLessonIndex(index); }} /> );
+      if (isTuesday && index === 3) { 
+        return ( 
+          <ScheduleItem key="class-hour" lesson={{ commonLesson: { name: 'Классный час', teacher: '', room: '', group: '' } }} index={index} isCurrent={isCurrent} isTuesday={true} isClassHour={true} onClick={() => {}} activeDayIndex={activeDayIndex} /> 
+        ); 
+      }
+      return ( 
+        <ScheduleItem key={customCourseId || index} lesson={lesson} index={index} isCurrent={isCurrent} isTuesday={isTuesday} hasNote={hasNoteForLesson(index)} onSubgroupChange={handleSubgroupChange} savedSubgroup={lessonData.subgroup} isTeacherView={isTeacherView} customCourseId={customCourseId} activeDayIndex={activeDayIndex} onClick={() => { if (lesson && !lesson.noLesson) setEditingLessonIndex(index); }} /> 
+      );
     });
   };
 
@@ -1258,35 +1245,6 @@ export function ScheduleScreen() {
         @keyframes tail { 0% { transform: rotateZ(60deg); } 50% { transform: rotateZ(0deg); } 100% { transform: rotateZ(-20deg); } }
         @keyframes zzz { 0% { color: transparent; } 50% { color: var(--color-primary); } 100% { color: transparent; } }
 
-        .floating-notification-banner {
-            position: fixed; top: 20px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 400px;
-            background: rgba(30, 30, 30, 0.95); backdrop-filter: blur(12px); border-radius: 20px; padding: 14px 18px;
-            box-shadow: 0 15px 40px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: space-between;
-            z-index: 2000; border: 1px solid rgba(255,255,255,0.1); animation: slideDownFade 0.4s ease;
-        }
-
-        @media (prefers-color-scheme: light) {
-             .floating-notification-banner { 
-               background: rgba(255, 255, 255, 0.98) !important; border: 1px solid rgba(0,0,0,0.12) !important; 
-               box-shadow: 0 12px 35px rgba(0,0,0,0.15) !important;
-             }
-             .notif-title { color: #000000 !important; font-weight: 800; }
-             .notif-desc { color: #444444 !important; font-weight: 500; }
-             .notif-close-btn { color: #625b71 !important; opacity: 1; }
-        }
-
-        @keyframes slideDownFade { from { opacity: 0; transform: translate(-50%, -30px); } to { opacity: 1; transform: translate(-50%, 0); } }
-        .notif-content { display: flex; align-items: center; gap: 14px; }
-        .notif-icon-box { width: 40px; height: 40px; border-radius: 14px; background: rgba(140, 103, 246, 0.15); display: flex; align-items: center; justify-content: center; }
-        .gradient-icon { background: -webkit-linear-gradient(135deg, #6200ea, #9d46ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .notif-text { display: flex; flex-direction: column; }
-        .notif-title { font-weight: 700; font-size: 14px; color: #fff; }
-        .notif-desc { font-weight: 500; font-size: 11px; color: rgba(255,255,255,0.7); margin-top: 1px; }
-        .notif-actions { display: flex; align-items: center; gap: 8px; }
-        .notif-btn { padding: 8px 14px; border-radius: 10px; font-weight: 700; font-size: 12px; cursor: pointer; border: none; transition: all 0.2s; }
-        .notif-btn.primary { background: #fff; color: #6200ea; }
-        .notif-btn.secondary { background: rgba(255,255,255,0.15); color: #fff; }
-        .notif-close-btn { background: transparent; border: none; color: rgba(255,255,255,0.5); display: flex; align-items: center; padding: 4px; cursor: pointer; }
         .dropdown-overlay { position: fixed; inset: 0; z-index: 1000; background: transparent; }
         
         .dropdown-menu-attached {
@@ -1344,12 +1302,10 @@ export function ScheduleScreen() {
                   onInstallApp={handleInstallApp} 
                   onOpenAllEvents={() => setIsAllEventsModalOpen(true)} 
                   onStartTour={startTour} 
-                  onRateApp={() => setIsRateModalOpen(true)} 
+                  onRateApp={handleRateOpen} 
                   onAddCourse={() => setIsAddCourseOpen(true)} 
-                  onSubscribePush={handlePushSubscription}
-                  isPushEnabled={isPushEnabled} 
                   onOpenSubsList={() => setIsSubsListOpen(true)}
-                  onSupport={() => setIsSupportOpen(true)}
+                  onSupport={() => window.open('https://t.me/ttgtapps', '_blank')}
               />
           </div>
         </div>
@@ -1359,12 +1315,6 @@ export function ScheduleScreen() {
               onSwitch={handleProfileSwitch} onAddProfile={handleAddProfile} isLoading={isSwitchingProfile} 
             />
         </div>
-        {showPushBanner && (
-            <FloatingNotificationBanner 
-                isEnabled={isPushEnabled} onToggle={handlePushSubscription} 
-                isSupported={isPushSupported} onClose={closePushBanner} 
-            />
-        )}
         <PracticeBanner info={practiceInfo} onClick={handlePracticeClick} />
         <PracticeDetailsModal isOpen={isPracticeModalOpen} onClose={() => setIsPracticeModalOpen(false)} info={practiceInfo} currentProfileId={currentProfileId} calendarEvents={calendarEvents} onNavigateToDate={handleNavigateToDate} />
         <div id="tour-days" className={`schedule-tabs-container ${swipeLimitReached ? 'limit-reached' : ''}`} ref={tabsContainerRef}>

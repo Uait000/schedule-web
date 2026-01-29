@@ -1,29 +1,39 @@
+// src/components/RateModal.tsx
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 
 interface RateModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (stars: number, comment: string) => void;
+  onSubmit: (stars: number, comment: string) => Promise<boolean>;
 }
 
 export function RateModal({ isOpen, onClose, onSubmit }: RateModalProps) {
   const [stars, setStars] = useState(0);
   const [comment, setComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showError, setShowError] = useState(false);
 
   if (!isOpen) return null;
 
+  const isFormValid = stars > 0 && comment.trim().length > 0;
+
   const handleSend = async () => {
-    if (stars === 0) return;
+    if (!isFormValid || isSubmitting) return;
+    
     setIsSubmitting(true);
-    await onSubmit(stars, comment);
+    const success = await onSubmit(stars, comment);
     setIsSubmitting(false);
-    onClose();
+    
+    if (success) {
+      onClose();
+    } else {
+      setShowError(true);
+    }
   };
 
   return createPortal(
-    <div className="rate-overlay" onClick={onClose}>
+    <div className="rate-overlay" onClick={() => { if (!isSubmitting) onClose(); }}>
       <div className="rate-card" onClick={e => e.stopPropagation()}>
         <div className="rate-content">
           <h2 className="rate-title">Оцените приложение</h2>
@@ -33,9 +43,10 @@ export function RateModal({ isOpen, onClose, onSubmit }: RateModalProps) {
             {[1, 2, 3, 4, 5].map((num) => (
               <button
                 key={num}
-                onClick={() => setStars(num)}
+                onClick={() => { setStars(num); setShowError(false); }}
                 className={`cat-item ${stars >= num ? 'active' : ''}`}
                 type="button"
+                disabled={isSubmitting}
               >
                 <span className="cat-icon">
                     {['😿', '😾', '🐱', '😺', '😻'][num - 1]}
@@ -44,24 +55,34 @@ export function RateModal({ isOpen, onClose, onSubmit }: RateModalProps) {
             ))}
           </div>
 
-          <textarea
-            placeholder="Расскажите, что вам понравилось или чего не хватает..."
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            className="rate-input"
-          />
+          <div style={{ width: '100%', position: 'relative' }}>
+            <textarea
+              placeholder="Расскажите, что вам понравилось или чего не хватает..."
+              value={comment}
+              onChange={(e) => { setComment(e.target.value); setShowError(false); }}
+              className={`rate-input ${stars > 0 && comment.trim().length === 0 ? 'warning' : ''}`}
+              disabled={isSubmitting}
+            />
+            {stars > 0 && comment.trim().length === 0 && (
+              <p style={{ color: '#ff4757', fontSize: '12px', marginTop: '-18px', marginBottom: '15px', fontWeight: '700' }}>
+                Напишите текст отзыва...
+              </p>
+            )}
+          </div>
 
           <div className="rate-buttons">
             <button
               className="btn-send"
               onClick={handleSend}
-              disabled={stars === 0 || isSubmitting}
+              disabled={!isFormValid || isSubmitting}
             >
               {isSubmitting ? 'Отправка...' : 'Отправить отзыв'}
             </button>
-            <button className="btn-later" onClick={onClose} type="button">
-              Позже
-            </button>
+            {!isSubmitting && (
+              <button className="btn-later" onClick={onClose} type="button">
+                Позже
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -86,8 +107,6 @@ export function RateModal({ isOpen, onClose, onSubmit }: RateModalProps) {
 
         .rate-card {
           background: var(--color-surface, #1c1c1e);
-          width: 100%;
-          max-width: 400px;
           width: min(400px, 95vw); 
           border-radius: 28px;
           border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
@@ -166,6 +185,12 @@ export function RateModal({ isOpen, onClose, onSubmit }: RateModalProps) {
           font-family: inherit;
           outline: none;
           box-sizing: border-box;
+          transition: border-color 0.3s;
+        }
+
+        .rate-input.warning {
+          border-color: #ff4757;
+          background: rgba(255, 71, 87, 0.05);
         }
 
         .rate-buttons {
@@ -211,27 +236,12 @@ export function RateModal({ isOpen, onClose, onSubmit }: RateModalProps) {
         @keyframes rateFadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes rateSlideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-        /* Светлая тема принудительно, если переменные не подхватились автоматически */
         @media (prefers-color-scheme: light) {
-          .rate-overlay {
-            background: rgba(255, 255, 255, 0.4);
-          }
-          .rate-card {
-            background: #ffffff;
-            border-color: rgba(0, 0, 0, 0.1);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-          }
-          .rate-title, .rate-subtitle {
-            color: #000000;
-          }
-          .rate-input {
-            background: #f2f2f7;
-            border-color: rgba(0, 0, 0, 0.1);
-            color: #000000;
-          }
-          .btn-later {
-            color: #000000;
-          }
+          .rate-overlay { background: rgba(255, 255, 255, 0.4); }
+          .rate-card { background: #ffffff; border-color: rgba(0, 0, 0, 0.1); box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15); }
+          .rate-title, .rate-subtitle { color: #000000; }
+          .rate-input { background: #f2f2f7; border-color: rgba(0, 0, 0, 0.1); color: #000000; }
+          .btn-later { color: #000000; }
         }
       `}</style>
     </div>,
