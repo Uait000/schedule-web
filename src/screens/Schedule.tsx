@@ -49,13 +49,7 @@ interface LessonData {
   lastUpdated?: number;
 }
 
-const DAYS_OF_WEEK = [ 
-  'Понедельник', 
-  'Вторник', 
-  'Среда', 
-  'Четверг', 
-  'Пятница' 
-];
+const DAYS_OF_WEEK = [ 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница' ];
 
 if (typeof window !== 'undefined') {
   window.addEventListener('error', async (e) => {
@@ -719,10 +713,13 @@ function TeacherMonitoringModal({
         }
         
         .group-name-cell { 
+          position: sticky;
+          left: 0;
+          z-index: 5;
           text-align: center !important; 
           font-weight: 900; 
           font-size: 19px; 
-          background: rgba(255,255,255,0.05); 
+          background: var(--color-surface, #1c1c1e); 
           color: var(--color-text);
           min-width: 130px;
         }
@@ -732,7 +729,7 @@ function TeacherMonitoringModal({
         .slot-cell.busy { color: rgba(255,255,255,0.1); font-weight: 700; }
         
         .monitoring-close-btn {
-          width: 100%; padding: 20px; border-radius: 24px; border: none;
+          width: 100%; padding: 22px; border-radius: 24px; border: none;
           background: var(--color-primary, #8c67f6); color: white; font-weight: 900; cursor: pointer;
           font-size: 17px; transition: all 0.2s; box-shadow: 0 6px 25px rgba(140, 103, 246, 0.4);
           flex-shrink: 0;
@@ -745,7 +742,7 @@ function TeacherMonitoringModal({
           .monitoring-card { background: #ffffff; border-color: rgba(0,0,0,0.1); box-shadow: 0 40px 100px rgba(0,0,0,0.2); color: #000; }
           .monitoring-table-wrapper { background: #f8f9fa; border-color: rgba(0,0,0,0.08); }
           .sticky-header { background: #ffffff; color: #8c67f6 !important; border-bottom: 3px solid #eee; box-shadow: 0 2px 8px rgba(0,0,0,0.08); font-size: 20px !important; }
-          .group-name-cell { background: #f2f2f7; color: #000; font-size: 19px; }
+          .group-name-cell { background: #ffffff; color: #000; font-size: 19px; }
           .slot-cell.busy { color: rgba(0,0,0,0.18); background: #fafafa; }
           .slot-cell.free { background: rgba(76, 217, 100, 0.18); color: #1e7e34; }
           .monitoring-table td { border-color: #eee; }
@@ -1621,10 +1618,13 @@ export function ScheduleScreen() {
         }
         
         .group-name-cell { 
+          position: sticky;
+          left: 0;
+          z-index: 5;
           text-align: center !important; 
           font-weight: 900; 
           font-size: 19px; 
-          background: rgba(255,255,255,0.05); 
+          background: var(--color-surface, #1c1c1e); 
           color: var(--color-text);
           min-width: 130px;
         }
@@ -1634,7 +1634,7 @@ export function ScheduleScreen() {
         .slot-cell.busy { color: rgba(255,255,255,0.1); font-weight: 700; }
         
         .monitoring-close-btn {
-          width: 100%; padding: 20px; border-radius: 24px; border: none;
+          width: 100%; padding: 22px; border-radius: 24px; border: none;
           background: var(--color-primary, #8c67f6); color: white; font-weight: 900; cursor: pointer;
           font-size: 17px; transition: all 0.2s; box-shadow: 0 6px 25px rgba(140, 103, 246, 0.4);
           flex-shrink: 0;
@@ -1647,7 +1647,7 @@ export function ScheduleScreen() {
           .monitoring-card { background: #ffffff; border-color: rgba(0,0,0,0.1); box-shadow: 0 40px 100px rgba(0,0,0,0.2); color: #000; }
           .monitoring-table-wrapper { background: #f8f9fa; border-color: rgba(0,0,0,0.08); }
           .sticky-header { background: #ffffff; color: #8c67f6 !important; border-bottom: 3px solid #eee; box-shadow: 0 2px 8px rgba(0,0,0,0.08); font-size: 20px !important; }
-          .group-name-cell { background: #f2f2f7; color: #000; font-size: 19px; }
+          .group-name-cell { background: #ffffff; color: #000; font-size: 19px; }
           .slot-cell.busy { color: rgba(0,0,0,0.18); background: #fafafa; }
           .slot-cell.free { background: rgba(76, 217, 100, 0.18); color: #1e7e34; }
           .monitoring-table td { border-color: #eee; }
