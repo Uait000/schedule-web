@@ -82,68 +82,77 @@ function getCourseFromGroupName(groupName: string): number | null {
 }
 
 function groupSubgroups(lessons: any[], isTeacherView: boolean): any[] {
-  if (!lessons || !Array.isArray(lessons)) return lessons;
-  if (isTeacherView) return lessons;
-   
-  const groupedLessons = [];
-  const subgroupMap = new Map();
-  const teacherSubgroupMap = new Map();
-   
-  for (let i = 0; i < lessons.length; i++) {
-    const lesson = lessons[i];
-    if (lesson && lesson.subgroupedLesson) {
+  if (!lessons || !Array.isArray(lessons) || lessons.length === 0) return lessons;
+  
+  const groupedLessons: any[] = [];
+  const lessonNameMap = new Map<string, any>();
+
+  lessons.forEach((lesson) => {
+    if (!lesson || lesson.noLesson) {
       groupedLessons.push(lesson);
-    } else if (lesson && lesson.commonLesson && lesson.commonLesson.teacher) {
-      const lessonName = lesson.commonLesson.name;
-      const teacher = lesson.commonLesson.teacher;
-       
-      if (!subgroupMap.has(lessonName)) {
-        subgroupMap.set(lessonName, {
-          subgroupedLesson: {
-            name: lessonName,
-            subgroups: []
-          }
-        });
-      }
-       
-      const groupedLesson = subgroupMap.get(lessonName);
-      let subgroupIndex = 1;
-      const teacherKey = `${lessonName}_${teacher}`;
-      if (teacherSubgroupMap.has(teacherKey)) {
-        subgroupIndex = teacherSubgroupMap.get(teacherKey);
-      } else {
-        const existingSubgroups = groupedLesson.subgroupedLesson.subgroups.length;
-        subgroupIndex = existingSubgroups + 1;
-        teacherSubgroupMap.set(teacherKey, subgroupIndex);
-      }
-       
-      const existingSubgroup = groupedLesson.subgroupedLesson.subgroups.find(
-        (sub: any) => sub.subgroup_index === subgroupIndex
-      );
-       
-      if (!existingSubgroup) {
-        groupedLesson.subgroupedLesson.subgroups.push({
-          teacher: teacher,
+      return;
+    }
+
+    const lessonObj = lesson.commonLesson || lesson.subgroupedLesson;
+    if (!lessonObj) {
+      groupedLessons.push(lesson);
+      return;
+    }
+
+    const lessonName = lessonObj.name;
+    if (!lessonNameMap.has(lessonName)) {
+      lessonNameMap.set(lessonName, {
+        subgroupedLesson: {
+          name: lessonName,
+          subgroups: []
+        }
+      });
+    }
+
+    const currentGrouped = lessonNameMap.get(lessonName);
+    
+    if (lesson.commonLesson) {
+      let subIdx = lesson.commonLesson.subgroup_index || lesson.commonLesson.subgroup || 0;
+      
+      const exists = currentGrouped.subgroupedLesson.subgroups.some((s: any) => (s.subgroup_index === subIdx && subIdx !== 0) && s.teacher === lesson.commonLesson.teacher && s.group === lesson.commonLesson.group);
+      
+      if (!exists) {
+        currentGrouped.subgroupedLesson.subgroups.push({
+          teacher: lesson.commonLesson.teacher || '',
           room: lesson.commonLesson.room || '',
-          subgroup_index: subgroupIndex,
+          subgroup_index: subIdx,
           group: lesson.commonLesson.group || ''
         });
       }
-    } else {
-      groupedLessons.push(lesson);
-    }
-  }
-   
-  subgroupMap.forEach((groupedLesson, lessonName) => {
-    if (groupedLesson.subgroupedLesson.subgroups.length > 1) {
-      const firstIndex = lessons.findIndex(lesson => 
-        lesson && lesson.commonLesson && lesson.commonLesson.name === lessonName
-      );
-      if (firstIndex !== -1) {
-        groupedLessons[firstIndex] = groupedLesson;
-      }
+    } else if (lesson.subgroupedLesson) {
+      lesson.subgroupedLesson.subgroups.forEach((sub: any) => {
+        let subIdx = sub.subgroup_index || sub.subgroup || 0;
+        currentGrouped.subgroupedLesson.subgroups.push({ ...sub, subgroup_index: subIdx });
+      });
     }
   });
+
+  lessonNameMap.forEach((grouped) => {
+    if (grouped.subgroupedLesson.subgroups.length > 1) {
+      grouped.subgroupedLesson.subgroups = grouped.subgroupedLesson.subgroups.map((s: any, i: number) => ({
+        ...s,
+        subgroup_index: s.subgroup_index || i + 1
+      }));
+      groupedLessons.push(grouped);
+    } else {
+      const single = grouped.subgroupedLesson.subgroups[0];
+      groupedLessons.push({
+        commonLesson: {
+          name: grouped.subgroupedLesson.name,
+          teacher: single.teacher,
+          room: single.room,
+          group: single.group,
+          subgroup_index: (single.subgroup_index === 0 || !single.subgroup_index) ? null : single.subgroup_index
+        }
+      });
+    }
+  });
+
   return groupedLessons;
 }
 
@@ -549,7 +558,19 @@ function TeacherMonitoringModal({
           const data = await scheduleApi.getInfo(groupName, formattedDate, 0, "");
           if (data.schedule) {
             const weekData = data.schedule.weeks[currentWeekNum % 2];
-            results[groupName] = weekData?.days[targetDayIdx]?.lessons || [];
+            const baseLessons = weekData?.days[targetDayIdx]?.lessons || [];
+            
+            // Учитываем замены для мониторинга
+            const overrides = data.overrides?.overrides || [];
+            const processedLessons = [...baseLessons];
+            
+            overrides.forEach((ov: any) => {
+              if (processedLessons[ov.index]) {
+                processedLessons[ov.index] = normalizeLesson(ov.willBe);
+              }
+            });
+            
+            results[groupName] = processedLessons;
           }
         } catch (err) {
           results[groupName] = [];
@@ -1043,7 +1064,7 @@ export function ScheduleScreen() {
 
   const handleRateSubmit = async (stars: number, comment: string) => {
     if (isRateSubmitting) return;
-    if (!comment || comment.trim().length === 0) {
+    if (stars < 5 && (!comment || comment.trim().length === 0)) {
       showMessage("Пожалуйста, напишите текст отзыва... Мы ценим обратную связь! ✍️");
       return; 
     }
@@ -1333,22 +1354,22 @@ export function ScheduleScreen() {
       if (day && day.lessons) {
         effectiveOverrides.forEach(override => {
           if (day.lessons[override.index] !== undefined) {
-              const currentCell = day.lessons[override.index];
+              const baseLesson = day.lessons[override.index];
               const willBe = normalizeLesson(override.willBe);
               const shouldBe = normalizeLesson(override.shouldBe);
 
               const isCancellation = willBe.noLesson || (willBe.commonLesson?.teacher?.toLowerCase() === 'нет');
 
               if (isCancellation) {
-                  if (currentCell && currentCell.subgroupedLesson) {
+                  if (baseLesson && baseLesson.subgroupedLesson) {
                       const teacherToRemove = (shouldBe.commonLesson?.teacher || "").split(' ')[0];
-                      const safeSubs = currentCell.subgroupedLesson.subgroups.filter(
+                      const safeSubs = baseLesson.subgroupedLesson.subgroups.filter(
                           s => !s.teacher.includes(teacherToRemove)
                       );
                       
                       if (safeSubs.length > 0) {
                           day.lessons[override.index] = {
-                              subgroupedLesson: { name: currentCell.subgroupedLesson.name, subgroups: safeSubs }
+                              subgroupedLesson: { name: baseLesson.subgroupedLesson.name, subgroups: safeSubs }
                           };
                       } else {
                           day.lessons[override.index] = { noLesson: {} };
@@ -1358,23 +1379,54 @@ export function ScheduleScreen() {
                   }
               } 
               else {
-                  if (currentCell && (currentCell as any).isAppliedOverride) {
-                      const baseSubs = currentCell.subgroupedLesson ? [...currentCell.subgroupedLesson.subgroups] : [currentCell.commonLesson];
-                      const addedSubs = willBe.subgroupedLesson ? [...willBe.subgroupedLesson.subgroups] : [willBe.commonLesson];
+                  const combinedSubgroups: any[] = [];
+                  const lessonName = willBe.commonLesson?.name || willBe.subgroupedLesson?.name || baseLesson.commonLesson?.name || "Урок";
 
-                      const syncMap = new Map();
-                      [...baseSubs, ...addedSubs].forEach(s => {
-                          if (s && s.teacher && s.teacher !== 'нет') syncMap.set(s.subgroup_index || 0, s);
-                      });
+                  const addSubs = (lesson: any) => {
+                    if (!lesson || lesson.noLesson) return;
+                    if (lesson.commonLesson) combinedSubgroups.push(lesson.commonLesson);
+                    else if (lesson.subgroupedLesson) combinedSubgroups.push(...lesson.subgroupedLesson.subgroups);
+                  };
 
+                  if (!shouldBe || shouldBe.noLesson) {
+                    if (!baseLesson.noLesson) addSubs(baseLesson);
+                    addSubs(willBe);
+                  } 
+                  else {
+                    const existingSubs: any[] = [];
+                    if (baseLesson.commonLesson) existingSubs.push(baseLesson.commonLesson);
+                    else if (baseLesson.subgroupedLesson) existingSubs.push(...baseLesson.subgroupedLesson.subgroups);
+
+                    const teacherToReplace = (shouldBe.commonLesson?.teacher || "").split(' ')[0];
+                    const keptSubs = existingSubs.filter(s => 
+                      !teacherToReplace || !s.teacher.includes(teacherToReplace)
+                    );
+
+                    combinedSubgroups.push(...keptSubs);
+                    addSubs(willBe);
+                  }
+
+                  if (combinedSubgroups.length > 1) {
                       day.lessons[override.index] = {
-                          subgroupedLesson: {
-                              name: willBe.commonLesson?.name || willBe.subgroupedLesson?.name || "Урок",
-                              subgroups: Array.from(syncMap.values()).sort((a,b) => (a.subgroup_index || 0) - (b.subgroup_index || 0))
-                          }
+                        subgroupedLesson: {
+                          name: lessonName,
+                          subgroups: combinedSubgroups.map((s, i) => ({
+                            ...s,
+                            subgroup_index: s.subgroup_index || i + 1
+                          }))
+                        }
                       };
-                  } else {
-                      day.lessons[override.index] = willBe;
+                  } else if (combinedSubgroups.length === 1) {
+                      const s = combinedSubgroups[0];
+                      day.lessons[override.index] = {
+                        commonLesson: {
+                          name: lessonName,
+                          teacher: s.teacher,
+                          room: s.room,
+                          group: s.group,
+                          subgroup_index: (s.subgroup_index === 0 || !s.subgroup_index) ? null : s.subgroup_index
+                        }
+                      };
                   }
               }
               if (day.lessons[override.index]) {
@@ -1537,124 +1589,6 @@ export function ScheduleScreen() {
         .snackbar-title { font-weight: 800; font-size: 14px; margin-bottom: 2px; }
         .snackbar-message { font-size: 12px; opacity: 0.8; line-height: 1.3; }
         .snackbar-btn { padding: 8px 14px; background: rgba(255,255,255,0.15); border: none; border-radius: 14px; color: inherit; font-weight: 700; font-size: 12px; cursor: pointer; }
-
-        .monitoring-overlay {
-          position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-          background: rgba(0,0,0,0.85); backdrop-filter: blur(14px);
-          z-index: 100000; display: flex; align-items: center; justify-content: center; padding: 16px;
-          animation: mFadeIn 0.3s ease;
-        }
-        @keyframes mFadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-        .monitoring-card {
-          background: var(--color-surface, #1c1c1e);
-          width: 100%; max-width: 850px; border-radius: 36px;
-          padding: 32px; color: var(--color-text, #fff); border: 1px solid rgba(255,255,255,0.1);
-          box-shadow: 0 40px 100px rgba(0,0,0,0.6);
-          display: flex; flex-direction: column; max-height: 90vh;
-        }
-
-        .monitoring-header { margin-bottom: 30px; flex-shrink: 0; }
-        .monitoring-nav { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 20px; }
-        
-        .nav-arrow.active { 
-          background: var(--color-primary, #8c67f6) !important; 
-          color: #fff !important; 
-          border-radius: 16px; 
-          width: 58px; 
-          height: 58px; 
-          display: flex; 
-          align-items: center; 
-          justify-content: center; 
-          cursor: pointer; 
-          border: none;
-          box-shadow: 0 8px 25px rgba(140, 103, 246, 0.5);
-          transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-          opacity: 1 !important;
-          z-index: 5;
-        }
-        .nav-arrow.active:active { transform: scale(0.9) rotate(-5deg); }
-        .nav-arrow.active .material-icons { font-size: 36px !important; color: #fff !important; }
-
-        .nav-title { text-align: center; flex: 1; }
-        .nav-title h3 { margin: 0; font-weight: 950; font-size: 32px; letter-spacing: -1px; color: var(--color-text); }
-        .nav-title p { opacity: 0.6; margin: 8px 0 0 0; text-transform: capitalize; font-weight: 800; font-size: 17px; color: var(--color-text); }
-        
-        .monitoring-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 300px; }
-        
-        .monitoring-table-wrapper { 
-          overflow-y: auto; 
-          overflow-x: auto;
-          margin-bottom: 25px; 
-          border-radius: 20px; 
-          background: rgba(255,255,255,0.02); 
-          border: 1px solid rgba(255,255,255,0.05); 
-          flex: 1;
-          scrollbar-width: thin;
-          scrollbar-color: var(--color-primary) transparent;
-        }
-        
-        .monitoring-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 600px; }
-        
-        .sticky-header {
-          position: sticky;
-          top: 0;
-          z-index: 10;
-          background: var(--color-surface, #1c1c1e);
-          padding: 24px !important;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-          color: var(--color-primary, #8c67f6) !important; 
-          font-weight: 950 !important; 
-          font-size: 20px !important; 
-          text-transform: uppercase;
-          border-bottom: 2px solid rgba(255,255,255,0.1);
-        }
-        
-        .monitoring-table td { 
-          padding: 22px; 
-          text-align: center; 
-          border-bottom: 1px solid rgba(255,255,255,0.04); 
-          border-right: 1px solid rgba(255,255,255,0.04);
-        }
-        
-        .group-name-cell { 
-          position: sticky;
-          left: 0;
-          z-index: 5;
-          text-align: center !important; 
-          font-weight: 900; 
-          font-size: 19px; 
-          background: var(--color-surface, #1c1c1e); 
-          color: var(--color-text);
-          min-width: 130px;
-        }
-        
-        .slot-cell { font-size: 12px; font-weight: 950; text-transform: uppercase; letter-spacing: 1px; }
-        .slot-cell.free { color: #4cd964; background: rgba(76, 217, 100, 0.12); }
-        .slot-cell.busy { color: rgba(255,255,255,0.1); font-weight: 700; }
-        
-        .monitoring-close-btn {
-          width: 100%; padding: 22px; border-radius: 24px; border: none;
-          background: var(--color-primary, #8c67f6); color: white; font-weight: 900; cursor: pointer;
-          font-size: 17px; transition: all 0.2s; box-shadow: 0 6px 25px rgba(140, 103, 246, 0.4);
-          flex-shrink: 0;
-        }
-        .monitoring-close-btn:active { transform: translateY(2px); box-shadow: none; }
-        .monitoring-loader { padding: 120px 0; text-align: center; font-weight: 900; opacity: 0.5; font-size: 20px; }
-
-        @media (prefers-color-scheme: light) {
-          .monitoring-overlay { background: rgba(0,0,0,0.5); }
-          .monitoring-card { background: #ffffff; border-color: rgba(0,0,0,0.1); box-shadow: 0 40px 100px rgba(0,0,0,0.2); color: #000; }
-          .monitoring-table-wrapper { background: #f8f9fa; border-color: rgba(0,0,0,0.08); }
-          .sticky-header { background: #ffffff; color: #8c67f6 !important; border-bottom: 3px solid #eee; box-shadow: 0 2px 8px rgba(0,0,0,0.08); font-size: 20px !important; }
-          .group-name-cell { background: #ffffff; color: #000; font-size: 19px; }
-          .slot-cell.busy { color: rgba(0,0,0,0.18); background: #fafafa; }
-          .slot-cell.free { background: rgba(76, 217, 100, 0.18); color: #1e7e34; }
-          .monitoring-table td { border-color: #eee; }
-          .nav-arrow.active { box-shadow: 0 8px 20px rgba(140, 103, 246, 0.4); }
-          .nav-title h3, .nav-title p { color: #000; }
-          .monitoring-close-btn { box-shadow: 0 6px 20px rgba(140, 103, 246, 0.3); }
-        }
 
         .container { position: relative; }
       `}</style>
