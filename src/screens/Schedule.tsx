@@ -498,10 +498,6 @@ function DropdownMenu({
             <button className="dropdown-item" onClick={() => handleMenuClick('changeGroup')}>
               <Icon name="group" /><span>Поменять группу</span>
             </button> 
-
-            <button className="dropdown-item" onClick={() => handleMenuClick('help')}>
-              <Icon name="help_outline" /><span>Как пользоваться?</span>
-            </button>
             
             <button className="dropdown-item" onClick={() => handleMenuClick('support')}>
               <Icon name="contact_support" />
@@ -853,7 +849,7 @@ function Snackbar({ message, isVisible, onClose, link, linkText }: { message: st
           <Icon name="cloud_sync" style={{ fontSize: '22px', color: '#fff' }} />
         </div>
         <div className="snackbar-text-area">
-            <div className="snackbar-title">Обновление</div>
+            <div className="snackbar-title">Уведомление</div>
             <div className="snackbar-text-area">
                 <div className="snackbar-message">{message}</div>
             </div>
@@ -1062,36 +1058,53 @@ export function ScheduleScreen() {
     } catch (error) { showMessage('Ошибка при загрузке'); } finally { setIsSwitchingProfile(false); }
   }, [isSwitchingProfile, loadProfileData, selectedDate, showMessage, setApplyOverrides]);
 
-  const handleRateSubmit = async (stars: number, comment: string) => {
-    if (isRateSubmitting) return;
-    if (stars < 5 && (!comment || comment.trim().length === 0)) {
-      showMessage("Пожалуйста, напишите текст отзыва... Мы ценим обратную связь! ✍️");
-      return; 
-    }
+const handleRateSubmit = async (stars: number, comment: string): Promise<boolean> => {
+    if (isRateSubmitting) return false;
+
+    // Проверка, если уже оценивали
     if (localStorage.getItem('app_rated') === 'true') {
         setIsRateModalOpen(false);
         showMessage("Вы уже оценивали приложение! ✨");
-        return;
+        return true;
     }
     
     setIsRateSubmitting(true);
+    const numericStars = Number(stars);
+
     try {
+      const finalComment = comment.trim().length > 0 ? comment : "(без комментария)";
+
       const payload = { 
-        stars: Number(stars), 
-        comment: String(comment || ""), 
+        stars: numericStars, 
+        comment: finalComment, 
         teacher: isTeacherView ? (appState.profiles.teacher?.name || "N/A") : null, 
         group: appState.profiles.student?.name || "N/A", 
         platform: 'web-ttgt-app' 
       };
       
-      await scheduleApi.postRate(payload);
+      const response = await scheduleApi.postRate(payload);
+      if (response.error) throw new Error(response.error);
+
       localStorage.setItem('app_rated', 'true'); 
-      setIsRateModalOpen(false);
-      showMessage("Спасибо! Мы получили ваш отзыв ❤️");
+
+      if (numericStars > 3) {
+        setIsRateModalOpen(false);
+        showMessage("Спасибо! Мы получили ваш отзыв ❤️");
+      } else {
+        showMessage("Спасибо за отзыв!");
+      }
+      
+      return true; 
     } catch(e) { 
+      console.error("Rate submission failed:", e);
       localStorage.setItem('app_rated', 'true'); 
-      setIsRateModalOpen(false);
-      showMessage("Спасибо! ❤️"); 
+      
+      if (numericStars > 3) {
+        setIsRateModalOpen(false);
+        showMessage("Спасибо! ❤️");
+      }
+      
+      return true; 
     } finally {
       setIsRateSubmitting(false);
     }
