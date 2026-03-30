@@ -27,7 +27,7 @@ import {
 } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { createPortal } from 'react-dom';
-import { scheduleApi } from '../api'; 
+import { scheduleApi } from '../api/api'; 
 import { useScheduleState } from '../hooks/useScheduleState';
 import { getDayIndex, getWeekNumber } from '../utils/dateUtils';
 import { useHistoryStorage } from '../hooks/useHistoryStorage';
@@ -40,7 +40,7 @@ import { AllEventsModal } from '../components/AllEventsModal';
 import { RateModal } from '../components/RateModal'; 
 import { findNextPractice, findUpcomingEvent, PracticeInfo } from '../utils/practiceUtils';
 import { SupportModal } from '../components/SupportModal'; 
-
+import { AboutModal } from '../components/AboutModal';
 const CURRENT_APP_VERSION = '2.9.2';
 
 interface LessonData {
@@ -418,7 +418,8 @@ function DropdownMenu({
   onRateApp,
   onSupport,
   isTeacher,
-  onOpenMonitoring
+  onOpenMonitoring,
+  onOpenAbout
 }: { 
   isOpen: boolean; 
   onClose: () => void; 
@@ -433,6 +434,7 @@ function DropdownMenu({
   onSupport: () => void;
   isTeacher: boolean;
   onOpenMonitoring: () => void;
+  onOpenAbout: () => void;
 }) { 
   const navigate = useNavigate(); 
    
@@ -449,6 +451,7 @@ function DropdownMenu({
     else if (action === 'allEvents') { onOpenAllEvents(); }
     else if (action === 'monitoring') { onOpenMonitoring(); }
     else if (action === 'support') { onSupport(); } 
+    else if (action === 'about') { onOpenAbout(); }
     else if (action === 'rate') { onRateApp(); } 
     else if (action === 'changeGroup') { 
       localStorage.removeItem('selectedId'); 
@@ -467,7 +470,7 @@ function DropdownMenu({
 
             {isTeacher && (
               <button className="dropdown-item" onClick={() => handleMenuClick('monitoring')}>
-                <Icon name="visibility" /><span>Окна у групп</span>
+                <Icon name="visibility" /><span>Свободные пары у групп</span>
               </button>
             )}
 
@@ -484,15 +487,11 @@ function DropdownMenu({
             </button> 
 
             <button className="dropdown-item" onClick={() => handleMenuClick('addCourse')}>
-              <Icon name="add_circle" /><span>Добавить курс</span>
+              <Icon name="add_circle" /><span>Добавить курсы</span>
             </button> 
 
             <button className="dropdown-item" onClick={() => handleMenuClick('install')}>
               <Icon name="download" /><span>Установить приложение</span>
-            </button> 
-
-            <button className="dropdown-item" onClick={() => handleMenuClick('rate')}>
-              <Icon name="star_outline" /><span>Оценить приложение</span>
             </button> 
 
             <button className="dropdown-item" onClick={() => handleMenuClick('changeGroup')}>
@@ -503,6 +502,11 @@ function DropdownMenu({
               <Icon name="contact_support" />
               <span>Техподдержка</span>
             </button> 
+
+            <button className="dropdown-item" onClick={() => handleMenuClick('about')}>
+              <Icon name="info" />
+              <span>О приложении</span>
+            </button>
         </div> 
     </>
   ); 
@@ -523,21 +527,33 @@ function TeacherMonitoringModal({
   const [groupsData, setGroupsData] = useState<Record<string, Lesson[]>>({});
   const [viewDate, setViewDate] = useState(initialDate);
 
-  const uniqueGroups = useMemo(() => {
-    if (!teacherSchedule) return [];
+const uniqueGroups = useMemo(() => {
+    // 🔥 БЕЗОПАСНАЯ ПРОВЕРКА: Если расписания нет или массива недель еще нет — возвращаем пустой список
+    if (!teacherSchedule || !teacherSchedule.weeks) return [];
+    
     const groups = new Set<string>();
+    
     teacherSchedule.weeks.forEach(week => {
+      // 🔥 БЕЗОПАСНАЯ ПРОВЕРКА: Защита от отсутствующего массива дней
+      if (!week.days) return; 
+      
       week.days.forEach(day => {
-        day.lessons.forEach(lesson => {
-          if (lesson.commonLesson?.group) groups.add(lesson.commonLesson.group);
+        // 🔥 БЕЗОПАСНАЯ ПРОВЕРКА: Защита от отсутствующего массива уроков
+        if (!day.lessons) return; 
+        
+        day.lessons.forEach((lesson: any) => {
+          if (lesson.commonLesson?.group) {
+            groups.add(lesson.commonLesson.group);
+          }
           if (lesson.subgroupedLesson?.subgroups) {
-            lesson.subgroupedLesson.subgroups.forEach(s => {
+            lesson.subgroupedLesson.subgroups.forEach((s: any) => {
               if (s.group) groups.add(s.group);
             });
           }
         });
       });
     });
+    
     return Array.from(groups).sort();
   }, [teacherSchedule]);
 
@@ -800,7 +816,7 @@ function processSubgroupedOverride(originalLesson: Lesson, overrideWillBe: Lesso
       (overrideSub.room === 'нет' || !overrideSub.room || overrideSub.room === 'null') ||
       (overrideSub.group === 'нет' || !overrideSub.group || overrideSub.group === 'null')
     );
-     
+      
     if (isCancelled) {
       originalSubgroupsMap.delete(key);
     } else {
@@ -875,12 +891,30 @@ export function ScheduleScreen() {
   const { activeDayIndex, setActiveDayIndex, activeWeekIndex, setActiveWeekIndex, applyOverrides, setApplyOverrides, selectedDate, setSelectedDate, resetToToday } = useScheduleState();
    
   const [appState, setAppState] = useState(() => dataStore.getState());
-  const [fullSchedule, setFullSchedule] = useState<Schedule | null>(null);
-  const [displaySchedule, setDisplaySchedule] = useState<Schedule | null>(null);
-  const [overrides, setOverrides] = useState<OverridesResponse | null>(null);
-  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
+
+  // 🔥 СИНХРОННАЯ ИНИЦИАЛИЗАЦИЯ (Optimistic UI) 
+  // Инициализируем стейт расписания напрямую из кэша appState
+  const [fullSchedule, setFullSchedule] = useState<Schedule | null>(() => {
+    const userType = localStorage.getItem('userType') as ProfileType || ProfileType.STUDENT;
+    return appState.profiles[userType === ProfileType.TEACHER ? 'teacher' : 'student']?.schedule || null;
+  });
+  
+  const [displaySchedule, setDisplaySchedule] = useState<Schedule | null>(fullSchedule); // Также сразу сетим displaySchedule
+
+  const [overrides, setOverrides] = useState<OverridesResponse | null>(() => {
+    const userType = localStorage.getItem('userType') as ProfileType || ProfileType.STUDENT;
+    return appState.profiles[userType === ProfileType.TEACHER ? 'teacher' : 'student']?.overrides || null;
+  });
+
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>(() => {
+    const profileId = localStorage.getItem('selectedId');
+    if (!profileId) return [];
+    return dataStore.getProfileMetadata(profileId).events || [];
+  });
    
-  const [isLoading, setIsLoading] = useState(false);
+  // Лоадер показываем ТОЛЬКО если в кэше вообще пусто
+  const [isLoading, setIsLoading] = useState(() => !fullSchedule);
+  
   const [isSupportLoading, setIsSupportLoading] = useState(false); 
   const [error, setError] = useState<string | null>(null);
   const [editingLessonIndex, setEditingLessonIndex] = useState<number | null>(null);
@@ -900,6 +934,7 @@ export function ScheduleScreen() {
   const [isRateModalOpen, setIsRateModalOpen] = useState(false); 
   const [isMonitoringOpen, setIsMonitoringOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false); 
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isRateSubmitting, setIsRateSubmitting] = useState(false);
   
   const currentProfileId = localStorage.getItem('selectedId') || 'default';
@@ -978,24 +1013,22 @@ export function ScheduleScreen() {
     if (!profileId) return;
     const formattedDate = format(date, 'yyyy-MM-dd');
     const metadata = dataStore.getProfileMetadata(profileId);
+    
     const currentFetchKey = `${profileId}_${formattedDate}_${metadata.scheduleUpdate}_${metadata.eventsHash}`;
     if (lastFetchRef.current === currentFetchKey) return;
     lastFetchRef.current = currentFetchKey;
+
     const cachedProfile = dataStore.getState().profiles[profileType === ProfileType.TEACHER ? 'teacher' : 'student'];
-    if (cachedProfile?.schedule) {
-        setFullSchedule(cachedProfile.schedule);
-        setOverrides(cachedProfile.overrides || null);
-        const sid = dataStore.getState().profiles.student?.id;
-        if (sid) {
-            const smeta = dataStore.getProfileMetadata(sid);
-            if (smeta.events) setCalendarEvents(smeta.events);
-        } else if (metadata.events) {
-            setCalendarEvents(metadata.events);
-        }
-    } else { setIsLoading(true); }
+    
+    // 🔥 Показываем лоадер только если нет кэша
+    if (!cachedProfile?.schedule) {
+      setIsLoading(true);
+    }
+    
     setError(null);
     try {
         const info = await scheduleApi.getInfo(profileId, formattedDate, metadata.scheduleUpdate || 0, metadata.eventsHash || "");
+        
         if (info.schedule) {
             const normalizedSchedule = { 
               ...info.schedule, 
@@ -1011,13 +1044,16 @@ export function ScheduleScreen() {
             };
             setFullSchedule(normalizedSchedule);
         }
+
         let events = info.events?.events || info.events || [];
         const studentId = dataStore.getState().profiles.student?.id;
         if (studentId && events.length === 0) {
+            // Если мы учитель, пытаемся стянуть события группы студента фоном
             const groupEvents = await scheduleApi.getInfo(studentId, formattedDate, 0, "").catch(() => null);
             if (groupEvents) events = groupEvents.events?.events || groupEvents.events || [];
         }
         if (events && events.length > 0) { setCalendarEvents(events); }
+
         if (info.overrides) {
             const normalizedOverrides = {
                 ...info.overrides,
@@ -1026,11 +1062,21 @@ export function ScheduleScreen() {
             setOverrides(normalizedOverrides);
             if (typeof addEntry === 'function') { addEntry(normalizedOverrides); }
         }
+
         await dataStore.updateProfileMetadata(profileId, { scheduleUpdate: info.schedule_update || metadata.scheduleUpdate, eventsHash: info.events?.sha256 || metadata.eventsHash, events: events });
-        await dataStore.updateData(s => ({ ...s, profiles: { ...s.profiles, [profileType === ProfileType.TEACHER ? 'teacher' : 'student']: { ...s.profiles[profileType === ProfileType.TEACHER ? 'teacher' : 'student'], id: profileId, schedule: info.schedule || fullSchedule, overrides: info.overrides || overrides } } }));
+        await dataStore.updateData(s => ({ ...s, profiles: { ...s.profiles, [profileType === ProfileType.TEACHER ? 'teacher' : 'student']: { ...s.profiles[profileType === ProfileType.TEACHER ? 'teacher' : 'student'], id: profileId, schedule: info.schedule || (fullSchedule as Schedule), overrides: info.overrides || (overrides as OverridesResponse) } } }));
     } catch (err) { 
-        if (!fullSchedule) setError('Ошибка сервера. Попробуйте позже.'); 
-    } finally { setIsLoading(false); }
+        // 🔥 Если произошла сетевая ошибка (таймаут)
+        if (!cachedProfile?.schedule && !fullSchedule) {
+            // И нет кэша - показываем ошибку
+            setError('Ошибка сети. Проверьте подключение.'); 
+        } else {
+            // Если кэш есть - молча работаем на нем (SWR паттерн)
+            console.warn('Офлайн режим: используются кэшированные данные.');
+        }
+    } finally { 
+        setIsLoading(false); 
+    }
   }, [fullSchedule, overrides, addEntry]);
 
   const handleProfileSwitch = useCallback(async (newType: ProfileType, newProfile: any) => {
@@ -1623,9 +1669,10 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
                   onStartTour={startTour} 
                   onRateApp={handleRateOpen} 
                   onAddCourse={() => setIsAddCourseOpen(true)} 
-                  onSupport={() => window.open('https://t.me/ttgtapps', '_blank')}
+                  onSupport={() => setIsSupportOpen(true)}
                   isTeacher={isTeacherView}
                   onOpenMonitoring={() => setIsMonitoringOpen(true)}
+                  onOpenAbout={() => setIsAboutOpen(true)}
               />
           </div>
         </div>
@@ -1708,6 +1755,19 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
           onClose={() => setIsMonitoringOpen(false)} 
           teacherSchedule={fullSchedule} 
           initialDate={selectedDate}
+        />
+
+        {/* 🔥 ВСТАВЛЯЕМ НАШИ НОВЫЕ ОКНА СЮДА */}
+        <SupportModal 
+          isOpen={isSupportOpen} 
+          onClose={() => setIsSupportOpen(false)} 
+          onSubmit={handleSupportSubmit} 
+          isLoading={isSupportLoading} 
+        />
+        
+        <AboutModal 
+          isOpen={isAboutOpen} 
+          onClose={() => setIsAboutOpen(false)} 
         />
 
         <Snackbar message={snackbarMessage || ''} isVisible={showSnackbar} onClose={() => { setShowSnackbar(false); setSnackbarLink(null); }} link={snackbarLink} linkText={snackbarLinkText} />
