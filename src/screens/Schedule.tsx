@@ -354,7 +354,7 @@ function CustomCalendar({ isOpen, onClose, onSelectDate, currentDate, calendarEv
           <span className="calendar-month-year">{format(viewDate, 'LLLL yyyy', { locale: ru })}</span> 
           <button onClick={() => setViewDate(addMonths(viewDate, 1))} className="calendar-nav-btn"><Icon name="chevron_right" /></button> 
         </div> 
-          
+           
         <div className="calendar-input-section"> 
           <div className="input-modern-wrapper">
              <Icon name="edit_calendar" style={{ opacity: 0.5, marginRight: '8px' }} />
@@ -528,17 +528,14 @@ function TeacherMonitoringModal({
   const [viewDate, setViewDate] = useState(initialDate);
 
 const uniqueGroups = useMemo(() => {
-    // 🔥 БЕЗОПАСНАЯ ПРОВЕРКА: Если расписания нет или массива недель еще нет — возвращаем пустой список
     if (!teacherSchedule || !teacherSchedule.weeks) return [];
     
     const groups = new Set<string>();
     
     teacherSchedule.weeks.forEach(week => {
-      // 🔥 БЕЗОПАСНАЯ ПРОВЕРКА: Защита от отсутствующего массива дней
       if (!week.days) return; 
       
       week.days.forEach(day => {
-        // 🔥 БЕЗОПАСНАЯ ПРОВЕРКА: Защита от отсутствующего массива уроков
         if (!day.lessons) return; 
         
         day.lessons.forEach((lesson: any) => {
@@ -572,7 +569,6 @@ const uniqueGroups = useMemo(() => {
             const weekData = data.schedule.weeks[currentWeekNum % 2];
             const baseLessons = weekData?.days[targetDayIdx]?.lessons || [];
             
-            // Учитываем замены для мониторинга
             const overrides = data.overrides?.overrides || [];
             const processedLessons = [...baseLessons];
             
@@ -892,14 +888,12 @@ export function ScheduleScreen() {
    
   const [appState, setAppState] = useState(() => dataStore.getState());
 
-  // 🔥 СИНХРОННАЯ ИНИЦИАЛИЗАЦИЯ (Optimistic UI) 
-  // Инициализируем стейт расписания напрямую из кэша appState
   const [fullSchedule, setFullSchedule] = useState<Schedule | null>(() => {
     const userType = localStorage.getItem('userType') as ProfileType || ProfileType.STUDENT;
     return appState.profiles[userType === ProfileType.TEACHER ? 'teacher' : 'student']?.schedule || null;
   });
   
-  const [displaySchedule, setDisplaySchedule] = useState<Schedule | null>(fullSchedule); // Также сразу сетим displaySchedule
+  const [displaySchedule, setDisplaySchedule] = useState<Schedule | null>(fullSchedule);
 
   const [overrides, setOverrides] = useState<OverridesResponse | null>(() => {
     const userType = localStorage.getItem('userType') as ProfileType || ProfileType.STUDENT;
@@ -912,7 +906,6 @@ export function ScheduleScreen() {
     return dataStore.getProfileMetadata(profileId).events || [];
   });
    
-  // Лоадер показываем ТОЛЬКО если в кэше вообще пусто
   const [isLoading, setIsLoading] = useState(() => !fullSchedule);
   
   const [isSupportLoading, setIsSupportLoading] = useState(false); 
@@ -1020,7 +1013,6 @@ export function ScheduleScreen() {
 
     const cachedProfile = dataStore.getState().profiles[profileType === ProfileType.TEACHER ? 'teacher' : 'student'];
     
-    // 🔥 Показываем лоадер только если нет кэша
     if (!cachedProfile?.schedule) {
       setIsLoading(true);
     }
@@ -1048,7 +1040,6 @@ export function ScheduleScreen() {
         let events = info.events?.events || info.events || [];
         const studentId = dataStore.getState().profiles.student?.id;
         if (studentId && events.length === 0) {
-            // Если мы учитель, пытаемся стянуть события группы студента фоном
             const groupEvents = await scheduleApi.getInfo(studentId, formattedDate, 0, "").catch(() => null);
             if (groupEvents) events = groupEvents.events?.events || groupEvents.events || [];
         }
@@ -1066,12 +1057,9 @@ export function ScheduleScreen() {
         await dataStore.updateProfileMetadata(profileId, { scheduleUpdate: info.schedule_update || metadata.scheduleUpdate, eventsHash: info.events?.sha256 || metadata.eventsHash, events: events });
         await dataStore.updateData(s => ({ ...s, profiles: { ...s.profiles, [profileType === ProfileType.TEACHER ? 'teacher' : 'student']: { ...s.profiles[profileType === ProfileType.TEACHER ? 'teacher' : 'student'], id: profileId, schedule: info.schedule || (fullSchedule as Schedule), overrides: info.overrides || (overrides as OverridesResponse) } } }));
     } catch (err) { 
-        // 🔥 Если произошла сетевая ошибка (таймаут)
         if (!cachedProfile?.schedule && !fullSchedule) {
-            // И нет кэша - показываем ошибку
             setError('Ошибка сети. Проверьте подключение.'); 
         } else {
-            // Если кэш есть - молча работаем на нем (SWR паттерн)
             console.warn('Офлайн режим: используются кэшированные данные.');
         }
     } finally { 
@@ -1107,7 +1095,6 @@ export function ScheduleScreen() {
 const handleRateSubmit = async (stars: number, comment: string): Promise<boolean> => {
     if (isRateSubmitting) return false;
 
-    // Проверка, если уже оценивали
     if (localStorage.getItem('app_rated') === 'true') {
         setIsRateModalOpen(false);
         showMessage("Вы уже оценивали приложение! ✨");
@@ -1448,7 +1435,6 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
                   };
 
                   if (!shouldBe || shouldBe.noLesson) {
-                    if (!baseLesson.noLesson) addSubs(baseLesson);
                     addSubs(willBe);
                   } 
                   else {
@@ -1456,9 +1442,11 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
                     if (baseLesson.commonLesson) existingSubs.push(baseLesson.commonLesson);
                     else if (baseLesson.subgroupedLesson) existingSubs.push(...baseLesson.subgroupedLesson.subgroups);
 
-                    const teacherToReplace = (shouldBe.commonLesson?.teacher || "").split(' ')[0];
+                    const getLastName = (t: string) => (t || "").split(' ')[0].trim().toLowerCase();
+                    const teacherToReplace = getLastName(shouldBe.commonLesson?.teacher || "");
+
                     const keptSubs = existingSubs.filter(s => 
-                      !teacherToReplace || !s.teacher.includes(teacherToReplace)
+                      !teacherToReplace || getLastName(s.teacher) !== teacherToReplace
                     );
 
                     combinedSubgroups.push(...keptSubs);
@@ -1757,7 +1745,6 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
           initialDate={selectedDate}
         />
 
-        {/* 🔥 ВСТАВЛЯЕМ НАШИ НОВЫЕ ОКНА СЮДА */}
         <SupportModal 
           isOpen={isSupportOpen} 
           onClose={() => setIsSupportOpen(false)} 
