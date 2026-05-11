@@ -107,6 +107,7 @@ const LessonContent = ({
   isClassHour?: boolean,
   isTeacherView?: boolean,
 }) => {
+  // 🔥 ФИКС: Проверка на существование объекта урока
   if (!lesson) {
     return (
       <div className="lesson-content">
@@ -126,7 +127,8 @@ const LessonContent = ({
     );
   }
 
-  if (lesson.commonLesson) {
+  // 🔥 ФИКС: Безопасное обращение через опциональную цепочку ?.
+  if (lesson?.commonLesson) {
     const { name, teacher, room, group } = lesson.commonLesson;
     
     const isPractice = name.toLowerCase().includes('практика') || name.toLowerCase().includes('аттестация') || name.toLowerCase().includes('гиа');
@@ -137,7 +139,6 @@ const LessonContent = ({
         <span className="lesson-details">
           {isTeacherView ? (
             <>
-              {/* 🔥 Отображаем группу для преподавателя */}
               {(group || (lesson as any).group) ? (
                 <span>Группа: {group || (lesson as any).group}<br /></span>
               ) : (
@@ -156,7 +157,7 @@ const LessonContent = ({
     );
   }
 
-  if (lesson.subgroupedLesson) {
+  if (lesson?.subgroupedLesson) {
     const { name, subgroups } = lesson.subgroupedLesson;
     
     return (
@@ -164,12 +165,11 @@ const LessonContent = ({
         <span className="lesson-name">{name}</span>
         
         <div className="subgroups-list" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
-            {subgroups.map((subgroup, idx) => (
+            {(subgroups || []).map((subgroup, idx) => (
                 <div key={idx} className="lesson-details" style={{ lineHeight: '1.2' }}>
                     <span style={{ fontWeight: 'bold', opacity: 0.8 }}>{idx + 1} п/г </span>
                     {isTeacherView ? (
                       <>
-                        {/* 🔥 Отображаем группу для преподавателя в подгруппах */}
                         {(subgroup.group || (lesson as any).group) && <span>Гр. {subgroup.group || (lesson as any).group} </span>}
                         {subgroup.room && <span style={{ whiteSpace: 'nowrap' }}> | <RoomDisplay room={subgroup.room} /></span>}
                       </>
@@ -186,7 +186,7 @@ const LessonContent = ({
     );
   }
 
-  if (lesson.noLesson) {
+  if (lesson?.noLesson) {
     return (
       <div className="lesson-content">
         <span className="lesson-name">Пары нет</span>
@@ -221,7 +221,12 @@ export default function ScheduleItem({
   
   const time = customTime ? customTime.replace('-', '\n') : getLessonTime(index, isTuesday);
   
-  const isEmpty = !isClassHour && (!lesson || lesson.noLesson || (!lesson.commonLesson && !lesson.subgroupedLesson));
+  // 🔥 ФИКС: Безопасная проверка пустого урока
+  const isEmpty = !isClassHour && (
+    !lesson || 
+    lesson?.noLesson || 
+    (!lesson?.commonLesson && !lesson?.subgroupedLesson)
+  );
 
   const isReallyCurrent = isLessonCurrent(index, activeDayIndex, isTuesday);
 
@@ -236,7 +241,7 @@ export default function ScheduleItem({
   
   let isPractice = false;
   if (lesson) {
-      const name = lesson.commonLesson?.name || lesson.subgroupedLesson?.name || '';
+      const name = lesson?.commonLesson?.name || lesson?.subgroupedLesson?.name || '';
       isPractice = name.toLowerCase().includes('практика') || 
                    name.toLowerCase().includes('гиа') || 
                    name.toLowerCase().includes('каникулы') ||

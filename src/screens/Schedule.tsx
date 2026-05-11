@@ -41,6 +41,7 @@ import { RateModal } from '../components/RateModal';
 import { findNextPractice, findUpcomingEvent, PracticeInfo } from '../utils/practiceUtils';
 import { SupportModal } from '../components/SupportModal'; 
 import { AboutModal } from '../components/AboutModal';
+
 const CURRENT_APP_VERSION = '2.9.2';
 
 interface LessonData {
@@ -51,6 +52,7 @@ interface LessonData {
 
 const DAYS_OF_WEEK = [ 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница' ];
 
+// Глобальный перехват ошибок для очистки битого кэша чанков
 if (typeof window !== 'undefined') {
   window.addEventListener('error', async (e) => {
     const target = e.target as any;
@@ -88,8 +90,9 @@ function groupSubgroups(lessons: any[], isTeacherView: boolean): any[] {
   const lessonNameMap = new Map<string, any>();
 
   lessons.forEach((lesson) => {
+    // 🔥 Защита от null
     if (!lesson || lesson.noLesson) {
-      groupedLessons.push(lesson);
+      groupedLessons.push(lesson || { noLesson: {} });
       return;
     }
 
@@ -113,8 +116,11 @@ function groupSubgroups(lessons: any[], isTeacherView: boolean): any[] {
     
     if (lesson.commonLesson) {
       let subIdx = lesson.commonLesson.subgroup_index || lesson.commonLesson.subgroup || 0;
-      
-      const exists = currentGrouped.subgroupedLesson.subgroups.some((s: any) => (s.subgroup_index === subIdx && subIdx !== 0) && s.teacher === lesson.commonLesson.teacher && s.group === lesson.commonLesson.group);
+      const exists = currentGrouped.subgroupedLesson.subgroups.some((s: any) => 
+        (s.subgroup_index === subIdx && subIdx !== 0) && 
+        s.teacher === lesson.commonLesson.teacher && 
+        s.group === lesson.commonLesson.group
+      );
       
       if (!exists) {
         currentGrouped.subgroupedLesson.subgroups.push({
@@ -125,7 +131,7 @@ function groupSubgroups(lessons: any[], isTeacherView: boolean): any[] {
         });
       }
     } else if (lesson.subgroupedLesson) {
-      lesson.subgroupedLesson.subgroups.forEach((sub: any) => {
+      (lesson.subgroupedLesson.subgroups || []).forEach((sub: any) => {
         let subIdx = sub.subgroup_index || sub.subgroup || 0;
         currentGrouped.subgroupedLesson.subgroups.push({ ...sub, subgroup_index: subIdx });
       });
@@ -141,15 +147,17 @@ function groupSubgroups(lessons: any[], isTeacherView: boolean): any[] {
       groupedLessons.push(grouped);
     } else {
       const single = grouped.subgroupedLesson.subgroups[0];
-      groupedLessons.push({
-        commonLesson: {
-          name: grouped.subgroupedLesson.name,
-          teacher: single.teacher,
-          room: single.room,
-          group: single.group,
-          subgroup_index: (single.subgroup_index === 0 || !single.subgroup_index) ? null : single.subgroup_index
-        }
-      });
+      if (single) {
+          groupedLessons.push({
+            commonLesson: {
+              name: grouped.subgroupedLesson.name,
+              teacher: single.teacher,
+              room: single.room,
+              group: single.group,
+              subgroup_index: (single.subgroup_index === 0 || !single.subgroup_index) ? null : single.subgroup_index
+            }
+          });
+      }
     }
   });
 
@@ -162,18 +170,9 @@ export function normalizeLesson(lesson: any): Lesson {
   }
 
   const findGroupAnywhere = (obj: any): string | undefined => {
-    if (!obj) return undefined;
+    if (!obj || typeof obj !== 'object') return undefined;
     if (typeof obj === 'string') return obj; 
-    if (typeof obj !== 'object') return undefined;
-    const candidates = [
-      'group', 
-      'Group', 
-      'studentGroup', 
-      'StudentGroup', 
-      'className', 
-      'targetGroup', 
-      'target'
-    ];
+    const candidates = ['group', 'Group', 'studentGroup', 'StudentGroup', 'className', 'targetGroup', 'target'];
     for (const key of candidates) {
         const val = obj[key];
         if (val) {
@@ -189,7 +188,6 @@ export function normalizeLesson(lesson: any): Lesson {
   };
 
   const globalGroup = findGroupAnywhere(lesson);
-
   const common = lesson.CommonLesson || lesson.commonLesson;
   if (common) {
     const localGroup = findGroupAnywhere(common);
@@ -221,7 +219,7 @@ export function normalizeLesson(lesson: any): Lesson {
       }
     };
   }
-   
+    
   if (lesson.name || lesson.teacher || lesson.room) {
     return {
       commonLesson: {
@@ -233,7 +231,7 @@ export function normalizeLesson(lesson: any): Lesson {
       }
     };
   }
-   
+    
   return { noLesson: {} };
 }
 
@@ -279,7 +277,7 @@ function CustomCalendar({ isOpen, onClose, onSelectDate, currentDate, calendarEv
   const startPadding = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1; 
    
   const isDateHoliday = (date: Date) => {
-    return calendarEvents.some(event => {
+    return (calendarEvents || []).some(event => {
       if (event.type !== 'holiday') return false;
       const start = startOfDay(parseISO(event.dateStart));
       const end = endOfDay(parseISO(event.dateEnd));
@@ -533,16 +531,16 @@ const uniqueGroups = useMemo(() => {
     const groups = new Set<string>();
     
     teacherSchedule.weeks.forEach(week => {
-      if (!week.days) return; 
+      if (!week || !week.days) return; 
       
       week.days.forEach(day => {
-        if (!day.lessons) return; 
+        if (!day || !day.lessons) return; 
         
         day.lessons.forEach((lesson: any) => {
-          if (lesson.commonLesson?.group) {
+          if (lesson?.commonLesson?.group) {
             groups.add(lesson.commonLesson.group);
           }
-          if (lesson.subgroupedLesson?.subgroups) {
+          if (lesson?.subgroupedLesson?.subgroups) {
             lesson.subgroupedLesson.subgroups.forEach((s: any) => {
               if (s.group) groups.add(s.group);
             });
@@ -565,14 +563,14 @@ const uniqueGroups = useMemo(() => {
       await Promise.all(uniqueGroups.map(async (groupName) => {
         try {
           const data = await scheduleApi.getInfo(groupName, formattedDate, 0, "");
-          if (data.schedule) {
+          if (data && data.schedule) {
             const weekData = data.schedule.weeks[currentWeekNum % 2];
-            const baseLessons = weekData?.days[targetDayIdx]?.lessons || [];
+            const baseLessons = weekData?.days?.[targetDayIdx]?.lessons || [];
             
-            const overrides = data.overrides?.overrides || [];
+            const overridesList = data.overrides?.overrides || [];
             const processedLessons = [...baseLessons];
             
-            overrides.forEach((ov: any) => {
+            overridesList.forEach((ov: any) => {
               if (processedLessons[ov.index]) {
                 processedLessons[ov.index] = normalizeLesson(ov.willBe);
               }
@@ -788,7 +786,7 @@ const uniqueGroups = useMemo(() => {
 }
 
 function processSubgroupedOverride(originalLesson: Lesson, overrideWillBe: Lesson): Lesson {
-  if (!originalLesson.subgroupedLesson) return overrideWillBe;
+  if (!originalLesson?.subgroupedLesson) return overrideWillBe;
   if (!overrideWillBe || overrideWillBe.noLesson) return { noLesson: {} };
   if (!overrideWillBe.subgroupedLesson) return overrideWillBe;
 
@@ -836,7 +834,7 @@ function processSubgroupedOverride(originalLesson: Lesson, overrideWillBe: Lesso
 function Snackbar({ message, isVisible, onClose, link, linkText }: { message: string; isVisible: boolean; onClose: () => void; link?: string | null; linkText?: string; }) { 
   useEffect(() => { 
     if (isVisible) { 
-      const timer = setTimeout(() => { onClose(); }, 7000);
+      const timer = setTimeout(() => { onClose(); }, 7000); 
       return () => clearTimeout(timer); 
     } 
   }, [isVisible, onClose]); 
@@ -890,14 +888,16 @@ export function ScheduleScreen() {
 
   const [fullSchedule, setFullSchedule] = useState<Schedule | null>(() => {
     const userType = localStorage.getItem('userType') as ProfileType || ProfileType.STUDENT;
-    return appState.profiles[userType === ProfileType.TEACHER ? 'teacher' : 'student']?.schedule || null;
+    const profileKey = userType === ProfileType.TEACHER ? 'teacher' : 'student';
+    return dataStore.getState().profiles[profileKey]?.schedule || null;
   });
   
   const [displaySchedule, setDisplaySchedule] = useState<Schedule | null>(fullSchedule);
 
   const [overrides, setOverrides] = useState<OverridesResponse | null>(() => {
     const userType = localStorage.getItem('userType') as ProfileType || ProfileType.STUDENT;
-    return appState.profiles[userType === ProfileType.TEACHER ? 'teacher' : 'student']?.overrides || null;
+    const profileKey = userType === ProfileType.TEACHER ? 'teacher' : 'student';
+    return dataStore.getState().profiles[profileKey]?.overrides || null;
   });
 
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>(() => {
@@ -1022,14 +1022,15 @@ export function ScheduleScreen() {
         const info = await scheduleApi.getInfo(profileId, formattedDate, metadata.scheduleUpdate || 0, metadata.eventsHash || "");
         
         if (info.schedule) {
+            // 🔥 УЛУЧШЕННАЯ НОРМАЛИЗАЦИЯ: Превращаем все уроки в объекты Lesson сразу
             const normalizedSchedule = { 
               ...info.schedule, 
-              weeks: info.schedule.weeks.map((week: any) => ({
+              weeks: (info.schedule.weeks || []).map((week: any) => ({
                 ...week,
-                days: week.days.map((day: any) => ({
+                days: (week.days || []).map((day: any) => ({
                     ...day,
                     lessons: (day.lessons || []).map((lesson: any) => 
-                        groupSubgroups([normalizeLesson(lesson)], profileType === ProfileType.TEACHER)[0] || normalizeLesson(lesson)
+                        lesson ? (groupSubgroups([normalizeLesson(lesson)], profileType === ProfileType.TEACHER)[0] || normalizeLesson(lesson)) : { noLesson: {} }
                     )
                 }))
               }))
@@ -1048,7 +1049,11 @@ export function ScheduleScreen() {
         if (info.overrides) {
             const normalizedOverrides = {
                 ...info.overrides,
-                overrides: (info.overrides.overrides || []).map((o: any) => ({ ...o, shouldBe: normalizeLesson(o.shouldBe), willBe: normalizeLesson(o.willBe) }))
+                overrides: (info.overrides.overrides || []).map((o: any) => ({ 
+                  ...o, 
+                  shouldBe: normalizeLesson(o.shouldBe), 
+                  willBe: normalizeLesson(o.willBe) 
+                }))
             };
             setOverrides(normalizedOverrides);
             if (typeof addEntry === 'function') { addEntry(normalizedOverrides); }
@@ -1116,7 +1121,7 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
       };
       
       const response = await scheduleApi.postRate(payload);
-      if (response.error) throw new Error(response.error);
+      if (response && response.error) throw new Error(response.error);
 
       localStorage.setItem('app_rated', 'true'); 
 
@@ -1308,7 +1313,7 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
 
   const hasNoteForLesson = (lessonIndex: number): boolean => {
     const lessonData = getSavedLessonData(currentProfileId, activeWeekIndex, activeDayIndex, lessonIndex);
-    return lessonData.notes.trim().length > 0;
+    return (lessonData.notes || '').trim().length > 0;
   };
 
   const hasInitialized = useRef(false);
@@ -1341,14 +1346,16 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
     }
   }, [selectedDateTime, currentProfileId, loadProfileData]);
 
+  // 🔥 ЭФФЕКТ ДЛЯ ПРИМЕНЕНИЯ ЗАМЕН (БЕЗОПАСНЫЙ)
   useEffect(() => {
     if (!fullSchedule) { setDisplaySchedule(null); return; }
+    
+    // Создаем глубокую копию, чтобы не мутировать стейт напрямую
     const newSchedule = JSON.parse(JSON.stringify(fullSchedule)) as Schedule;
     const currentWeekData = newSchedule.weeks?.[activeWeekIndex % 2];
-    if (!currentWeekData) { setDisplaySchedule(newSchedule); return; }
+    if (!currentWeekData || !currentWeekData.days) { setDisplaySchedule(newSchedule); return; }
     
     const curDate = new Date(selectedDateTime);
-    
     if (!applyOverrides) { setDisplaySchedule(newSchedule); return; }
     
     let effectiveOverrides: any[] = [];
@@ -1374,8 +1381,8 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
                     substitutesDateMatches = true;
                     stOverrides.overrides.forEach((stOv: any) => {
                         const willBe = normalizeLesson(stOv.willBe);
-                        const teacherInOverride = willBe.commonLesson?.teacher || "";
-                        const subgroupTeachers = willBe.subgroupedLesson?.subgroups.map((s:any) => s.teacher) || [];
+                        const teacherInOverride = willBe?.commonLesson?.teacher || "";
+                        const subgroupTeachers = willBe?.subgroupedLesson?.subgroups?.map((s:any) => s.teacher) || [];
                         
                         let isRelevant = teacherInOverride.includes(teacherLastName) || 
                                        subgroupTeachers.some(t => t.includes(teacherLastName));
@@ -1409,7 +1416,7 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
               if (isCancellation) {
                   if (baseLesson && baseLesson.subgroupedLesson) {
                       const teacherToRemove = (shouldBe.commonLesson?.teacher || "").split(' ')[0];
-                      const safeSubs = baseLesson.subgroupedLesson.subgroups.filter(
+                      const safeSubs = (baseLesson.subgroupedLesson.subgroups || []).filter(
                           s => !s.teacher.includes(teacherToRemove)
                       );
                       
@@ -1426,12 +1433,14 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
               } 
               else {
                   const combinedSubgroups: any[] = [];
-                  const lessonName = willBe.commonLesson?.name || willBe.subgroupedLesson?.name || baseLesson.commonLesson?.name || "Урок";
+                  const lessonName = willBe.commonLesson?.name || willBe.subgroupedLesson?.name || baseLesson?.commonLesson?.name || "Урок";
 
                   const addSubs = (lesson: any) => {
                     if (!lesson || lesson.noLesson) return;
                     if (lesson.commonLesson) combinedSubgroups.push(lesson.commonLesson);
-                    else if (lesson.subgroupedLesson) combinedSubgroups.push(...lesson.subgroupedLesson.subgroups);
+                    else if (lesson.subgroupedLesson && lesson.subgroupedLesson.subgroups) {
+                        combinedSubgroups.push(...lesson.subgroupedLesson.subgroups);
+                    }
                   };
 
                   if (!shouldBe || shouldBe.noLesson) {
@@ -1439,11 +1448,13 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
                   } 
                   else {
                     const existingSubs: any[] = [];
-                    if (baseLesson.commonLesson) existingSubs.push(baseLesson.commonLesson);
-                    else if (baseLesson.subgroupedLesson) existingSubs.push(...baseLesson.subgroupedLesson.subgroups);
+                    if (baseLesson?.commonLesson) existingSubs.push(baseLesson.commonLesson);
+                    else if (baseLesson?.subgroupedLesson?.subgroups) {
+                        existingSubs.push(...baseLesson.subgroupedLesson.subgroups);
+                    }
 
                     const getLastName = (t: string) => (t || "").split(' ')[0].trim().toLowerCase();
-                    const teacherToReplace = getLastName(shouldBe.commonLesson?.teacher || "");
+                    const teacherToReplace = getLastName(shouldBe?.commonLesson?.teacher || "");
 
                     const keptSubs = existingSubs.filter(s => 
                       !teacherToReplace || getLastName(s.teacher) !== teacherToReplace
@@ -1487,18 +1498,27 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
     setDataVersion(v => v + 1);
   }, [fullSchedule, overrides, applyOverrides, calendarEvents, selectedDateTime, activeWeekIndex, activeDayIndex, isTeacherView, appState.profiles, currentProfileId]);
 
+  // 🔥 БЕЗОПАСНАЯ ФОРМИРОВКА СПИСКА УРОКОВ
   const lessonsToShow = useMemo(() => {
       const weekData = displaySchedule?.weeks?.[activeWeekIndex % 2];
       const baseLessons = weekData?.days?.[activeDayIndex]?.lessons;
       const lessonCount = activeDayIndex === 1 ? 6 : 5;
+      
       const lessonsArray = Array.from({ length: lessonCount }, (_, i) => {
+          let lesson;
           if (activeDayIndex === 1) {
               if (i === 3) return { noLesson: {} };
-              else if (i < 3) return (baseLessons && baseLessons[i]) ? baseLessons[i] : { noLesson: {} };
-              else { const baseIndex = i - 1; return (baseLessons && baseLessons[baseIndex]) ? baseLessons[baseIndex] : { noLesson: {} }; }
-          } else { return (baseLessons && baseLessons[i]) ? baseLessons[i] : { noLesson: {} }; }
+              else if (i < 3) lesson = baseLessons?.[i];
+              else lesson = baseLessons?.[i - 1];
+          } else {
+              lesson = baseLessons?.[i];
+          }
+          
+          // 🔥 ФИКС: Если lesson === null или undefined, возвращаем объект "Пары нет"
+          return (lesson && typeof lesson === 'object') ? lesson : { noLesson: {} };
       });
-      const myCourses = appState.customCourses.filter(c => c.weekIndex === activeWeekIndex && c.dayIndex === activeDayIndex && c.profileId === currentProfileId);
+
+      const myCourses = (appState.customCourses || []).filter(c => c.weekIndex === activeWeekIndex && c.dayIndex === activeDayIndex && c.profileId === currentProfileId);
       myCourses.forEach(course => {
         const index = course.lessonIndex;
         let targetIndex = activeDayIndex === 1 && index >= 3 ? index + 1 : index;
@@ -1512,18 +1532,32 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
   }, [displaySchedule, activeWeekIndex, activeDayIndex, appState.customCourses, currentProfileId]);
 
   const renderLessons = () => {
-    return lessonsToShow.map((lesson, index) => {
+    return (lessonsToShow || []).map((lesson, index) => {
       const isTuesday = activeDayIndex === 1;
       const isCurrent = isLessonCurrent(index, activeDayIndex, isTuesday);
       const lessonData = getSavedLessonData(currentProfileId, activeWeekIndex, activeDayIndex, index);
-      const customCourseId = lesson ? (lesson as any).customCourseId : undefined;
+      const customCourseId = (lesson as any)?.customCourseId;
+      
       if (isTuesday && index === 3) { 
         return ( 
           <ScheduleItem key="class-hour" lesson={{ commonLesson: { name: 'Классный час', teacher: '', room: '', group: '' } }} index={index} isCurrent={isCurrent} isTuesday={true} isClassHour={true} onClick={() => {}} activeDayIndex={activeDayIndex} /> 
         ); 
       }
       return ( 
-        <ScheduleItem key={customCourseId || index} lesson={lesson} index={index} isCurrent={isCurrent} isTuesday={isTuesday} hasNote={hasNoteForLesson(index)} onSubgroupChange={handleSubgroupChange} savedSubgroup={lessonData.subgroup} isTeacherView={isTeacherView} customCourseId={customCourseId} activeDayIndex={activeDayIndex} onClick={() => { if (lesson && !lesson.noLesson) setEditingLessonIndex(index); }} /> 
+        <ScheduleItem 
+          key={customCourseId || index} 
+          lesson={lesson} 
+          index={index} 
+          isCurrent={isCurrent} 
+          isTuesday={isTuesday} 
+          hasNote={hasNoteForLesson(index)} 
+          onSubgroupChange={handleSubgroupChange} 
+          savedSubgroup={lessonData.subgroup} 
+          isTeacherView={isTeacherView} 
+          customCourseId={customCourseId} 
+          activeDayIndex={activeDayIndex} 
+          onClick={() => { if (lesson && !lesson.noLesson) setEditingLessonIndex(index); }} 
+        /> 
       );
     });
   };
@@ -1535,7 +1569,12 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
     if (isTeacherView && !appState.profiles.student?.id) return null;
     let info: PracticeInfo | null = null;
     const curDate = new Date(selectedDateTime), today = startOfDay(new Date());
-    const activeEvent = calendarEvents.find(ev => isWithinInterval(curDate, { start: startOfDay(parseISO(ev.dateStart)), end: endOfDay(parseISO(ev.dateEnd)) }));
+    const activeEvent = (calendarEvents || []).find(ev => {
+      try {
+        return isWithinInterval(curDate, { start: startOfDay(parseISO(ev.dateStart)), end: endOfDay(parseISO(ev.dateEnd)) });
+      } catch(e) { return false; }
+    });
+    
     if (activeEvent && activeEvent.type !== 'gia' && activeEvent.code !== 'III' && activeEvent.code !== 'D') {
         info = { name: activeEvent.title, type: activeEvent.type as any, code: activeEvent.code, dateStart: parseISO(activeEvent.dateStart), dateEnd: parseISO(activeEvent.dateEnd), daysUntil: differenceInCalendarDays(parseISO(activeEvent.dateStart), today), isActive: differenceInCalendarDays(parseISO(activeEvent.dateStart), today) <= 0 };
     } else if (!activeEvent) {
@@ -1626,7 +1665,7 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
             .dropdown-item span { color: #1a1a1a; }
         }
 
-        .modern-snackbar { position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 380px; background: rgba(20, 20, 20, 0.85); backdrop-filter: blur(16px); color: #fff; border-radius: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); z-index: 2100; overflow: hidden; animation: slideUpSnack 0.5s ease; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; padding-right: 6px; }
+        .modern-snackbar { position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 380px; background: rgba(20, 20, 20, 0.85); backdrop-filter: blur(166px); color: #fff; border-radius: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); z-index: 2100; overflow: hidden; animation: slideUpSnack 0.5s ease; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; padding-right: 6px; }
         @media (prefers-color-scheme: light) { .modern-snackbar { background: rgba(255, 255, 255, 0.85); color: #000; border: 1px solid rgba(0,0,0,0.05); } .snackbar-title { color: #000; } .snackbar-message { color: rgba(0,0,0,0.7); } .snackbar-btn { background: rgba(0,0,0,0.05); color: #000; } .snackbar-left-border { background: #6200ea; } }
         @keyframes slideUpSnack { from { transform: translate(-50%, 100px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
         .snackbar-left-border { width: 4px; height: 40px; background: #fff; border-radius: 10px; margin-left: 16px; }
@@ -1678,7 +1717,7 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
               <button key={day} className={`tab-button ${activeDayIndex === index ? 'active' : ''}`} onClick={() => handleDayChange(index)} disabled={isAnimating || isSwitchingProfile}>
                 <span className="tab-button-content">
                   <span className="tab-day-name">{day}</span>
-                  <span className="tab-day-date">{format(currentWeekDates[index], 'd MMMM', { locale: ru })}</span>
+                  <span className="tab-day-date">{currentWeekDates[index] ? format(currentWeekDates[index], 'd MMMM', { locale: ru }) : ''}</span>
                   {activeDayIndex === index && <div className="tab-indicator" />}
                 </span>
               </button>
