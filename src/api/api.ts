@@ -1,7 +1,7 @@
 // src/api/api.ts
 import { InfoResponse } from '../types';
 
-const API_BASE_URL = 'https://schedulettgt.ru'; 
+const API_BASE_URL = import.meta.env.DEV ? '/api' : 'https://schedulettgt.ru';
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // Увеличим до суток для надежного офлайна
 
 /**

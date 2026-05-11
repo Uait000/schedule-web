@@ -7,20 +7,18 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      injectRegister: false, // Оставляем false, если вы регистрируете воркер вручную в main.tsx
+      injectRegister: false, 
       workbox: {
-        // Кэшируем все эти типы файлов для работы без сети
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
         
-        // 🔥 РЕШЕНИЕ ПРОБЛЕМЫ F5: 
-        // Если юзер обновил страницу без сети, всегда отдаем базовый index.html
         navigateFallback: '/index.html',
         
-        // Исключаем API-запросы из этого правила, чтобы вместо JSON не прилетал HTML-код
         navigateFallbackDenylist: [/^\/api/],
         
-        // Автоматически удаляем старые версии файлов из кэша
         cleanupOutdatedCaches: true,
+
+        skipWaiting: true,
+        clientsClaim: true,
       },
       manifest: {
         name: 'Расписание ТТЖТ',

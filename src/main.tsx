@@ -4,6 +4,15 @@ import './index.css'
 import { BrowserRouter } from 'react-router-dom' 
 import { migrateOldDataToDataStore } from './utils/migration'
 
+// 🔥 ИСПРАВЛЕНИЕ 1: Глобальный перехват ошибок загрузки чанков (решает проблему серого экрана при обновлениях)
+window.addEventListener('error', (e) => {
+  const message = e.message || '';
+  if (message.includes('ChunkLoadError') || message.includes('Loading chunk')) {
+    console.warn('Обнаружена ошибка загрузки ресурсов. Перезагрузка приложения...');
+    window.location.reload();
+  }
+}, true);
+
 // Инициализация Telegram Web App
 declare global {
   interface Window {
@@ -13,8 +22,12 @@ declare global {
   }
 }
 
-// Мигрируем данные при запуске приложения
-migrateOldDataToDataStore();
+// 🔥 ИСПРАВЛЕНИЕ 2: Безопасный запуск миграции (чтобы битые данные в кэше не "вешали" старт)
+try {
+  migrateOldDataToDataStore();
+} catch (error) {
+  console.error('⚠️ Критическая ошибка при миграции данных:', error);
+}
 
 // PWA Service Worker регистрация
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
@@ -31,6 +44,7 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
               if (installingWorker.state === 'installed') {
                 if (navigator.serviceWorker.controller) {
                   console.log('🆕 Доступна новая версия PWA');
+                  // Здесь можно добавить уведомление для пользователя
                 } else {
                   console.log('📱 PWA готов к работе оффлайн');
                 }
@@ -42,6 +56,14 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
       .catch((error) => {
         console.log('❌ Ошибка регистрации PWA Service Worker:', error);
       });
+  });
+
+  // Автоматическая перезагрузка страниц при смене контроллера (активация нового SW)
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
   });
 }
 

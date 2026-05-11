@@ -5,11 +5,15 @@
 [build.environment]
   NODE_VERSION = "18"
 
+# Настройка заголовков для предотвращения кеширования index.html
 [[headers]]
   for = "/*.html"
   [headers.values]
+    # Запрещаем кеширование, чтобы браузер всегда проверял наличие новой версии
     Cache-Control = "no-cache, no-store, must-revalidate"
+    Pragma = "no-cache"
 
+# Настройка долгосрочного кеширования для статики (картинки, шрифты, скрипты с хешами)
 [[headers]]
   for = "/assets/*"
   [headers.values]
@@ -20,6 +24,16 @@
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
 
+# 🔥 ИСПРАВЛЕНИЕ CORS И ПРОКСИ:
+# Перенаправляем запросы /api на реальный сервер
+# Это правило должно идти ПЕРВЫМ в списке редиректов
+[[redirects]]
+  from = "/api/*"
+  to = "https://schedulettgt.ru/:splat"
+  status = 200
+  force = true
+
+# Редирект для работы Single Page Application (SPA)
 [[redirects]]
   from = "/*"
   to = "/index.html"

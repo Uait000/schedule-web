@@ -3,6 +3,55 @@
   <head>
     <meta charset="UTF-8" />
     
+    <script>
+      // 🔥 МЕХАНИЗМ АВТО-ОБНОВЛЕНИЯ (Программная чистка кэша)
+      (function() {
+        // МЕНЯЙ ЭТУ СТРОКУ ПРИ КАЖДОМ ДЕПЛОЕ, ЧТОБЫ У ЛЮДЕЙ ВСЁ ОБНОВИЛОСЬ!
+        const APP_VERSION = '1.1.0'; 
+        const savedVersion = localStorage.getItem('app_version');
+
+        if (savedVersion !== APP_VERSION) {
+          console.log('🚀 Обнаружена новая версия! Очистка системного кэша...');
+
+          // 1. Удаляем все Service Workers
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(registrations => {
+              for (let registration of registrations) {
+                registration.unregister();
+              }
+            });
+          }
+
+          // 2. Очищаем Cache Storage (те самые 2.8 МБ со скриншота)
+          if ('caches' in window) {
+            caches.keys().then(names => {
+              for (let name of names) caches.delete(name);
+            });
+          }
+
+          // 3. Сохраняем новую версию
+          localStorage.setItem('app_version', APP_VERSION);
+          
+          // 4. Мягко очищаем маршруты, чтобы избежать циклической ошибки
+          localStorage.removeItem('lastVisitedRoute'); 
+
+          // Даем небольшую паузу для завершения процессов и перезагружаем
+          setTimeout(() => {
+            window.location.reload(true);
+          }, 500);
+        }
+      })();
+
+      // Предохранитель на ошибки загрузки ресурсов (404)
+      window.addEventListener('error', function(e) {
+        if (e.target && (e.target.tagName === 'SCRIPT' || e.target.tagName === 'LINK')) {
+          const url = e.target.src || e.target.href;
+          console.error('Критический ресурс не загружен:', url);
+          window.location.reload();
+        }
+      }, true);
+    </script>
+
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" type="image/svg+xml" href="/react.svg" />
     <link rel="icon" type="image/png" href="/icon-192x192.png" />
@@ -123,7 +172,7 @@
       <button id="cancel-install" class="secondary">Позже</button>
     </div>
     
-    <script type="module" src="/src/main.tsx"></script>
+    <script type="module" src="/src/main.tsx" onerror="window.location.reload()"></script>
     
     <script>
       function optimizeFontLoading() {
@@ -180,7 +229,6 @@
             localStorage.setItem('installPromptDismissed', Date.now().toString());
           });
 
-          // 🔥 ИСПРАВЛЕНИЕ: Автоматическая перезагрузка при обновлении SW
           if ('serviceWorker' in navigator) {
             navigator.serviceWorker.addEventListener('controllerchange', () => {
               if (this.refreshing) return;
@@ -232,7 +280,6 @@
                   const newWorker = registration.installing;
                   newWorker.addEventListener('statechange', () => {
                     if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                      // Сообщаем пользователю или просто даем controllerchange сделать свое дело
                       if (confirm('Доступна новая версия! Обновить сейчас?')) {
                         newWorker.postMessage({ type: 'SKIP_WAITING' });
                         window.location.reload();
