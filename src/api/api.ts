@@ -1,7 +1,7 @@
 // src/api/api.ts
 import { InfoResponse } from '../types';
 
-const API_BASE_URL = import.meta.env.DEV ? '/api' : 'https://schedulettgt.ru';
+const API_BASE_URL = import.meta.env.DEV ? 'http://127.0.0.1:8000' : 'https://schedulettgt.ru';
 const CACHE_DURATION = 24 * 60 * 60 * 1000; 
 
 /**

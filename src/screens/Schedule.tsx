@@ -1346,11 +1346,11 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
     }
   }, [selectedDateTime, currentProfileId, loadProfileData]);
 
-  // 🔥 ЭФФЕКТ ДЛЯ ПРИМЕНЕНИЯ ЗАМЕН (БЕЗОПАСНЫЙ)
+// 🔥 ЭФФЕКТ ДЛЯ ПРИМЕНЕНИЯ ЗАМЕН (ПОЛНОСТЬЮ ИСПРАВЛЕННЫЙ И ОТКАЗОУСТОЙЧИВЫЙ)
   useEffect(() => {
     if (!fullSchedule) { setDisplaySchedule(null); return; }
     
-    // Создаем глубокую копию, чтобы не мутировать стейт напрямую
+    // Создаем глубокую копию сетки расписания
     const newSchedule = JSON.parse(JSON.stringify(fullSchedule)) as Schedule;
     const currentWeekData = newSchedule.weeks?.[activeWeekIndex % 2];
     if (!currentWeekData || !currentWeekData.days) { setDisplaySchedule(newSchedule); return; }
@@ -1402,7 +1402,7 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
         });
     }
 
-    if (substitutesDateMatches && effectiveOverrides.length > 0) {
+if (substitutesDateMatches && effectiveOverrides.length > 0) {
       const day = currentWeekData.days[activeDayIndex];
       if (day && day.lessons) {
         effectiveOverrides.forEach(override => {
@@ -1411,13 +1411,22 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
               const willBe = normalizeLesson(override.willBe);
               const shouldBe = normalizeLesson(override.shouldBe);
 
-              const isCancellation = willBe.noLesson || (willBe.commonLesson?.teacher?.toLowerCase() === 'нет');
+              const isCancellation = willBe.noLesson || (willBe.commonLesson?.teacher?.toLowerCase() === 'нет') || (typeof override.willBe === 'string' && override.willBe.toLowerCase().includes('снят'));
 
+              // ==========================================
+              // КЕЙС 1: СНЯТИЕ ПАРЫ ИЛИ ПОДГРУППЫ (ОТМЕНА)
+              // ==========================================
               if (isCancellation) {
-                  if (baseLesson && baseLesson.subgroupedLesson) {
-                      const teacherToRemove = (shouldBe.commonLesson?.teacher || "").split(' ')[0];
+                  const teacherToRemove = (shouldBe?.commonLesson?.teacher || shouldBe?.subgroupedLesson?.subgroups?.[0]?.teacher || "").split(' ')[0].trim().toLowerCase();
+                  
+                  // 🔥 ИСПРАВЛЕНИЕ: Если мы в режиме преподавателя (isTeacherView) ИЛИ в shouldBe нет конкретного препода
+                  // ИЛИ базовый урок не разделен на подгруппы — снимаем всю пару (для данного профиля) целиком
+                  if (isTeacherView || !teacherToRemove || !baseLesson?.subgroupedLesson) {
+                      day.lessons[override.index] = { noLesson: {} };
+                  } else {
+                      // Снимаем точечно подгруппу конкретного преподавателя (для студентов)
                       const safeSubs = (baseLesson.subgroupedLesson.subgroups || []).filter(
-                          s => !s.teacher.includes(teacherToRemove)
+                          s => !s.teacher.split(' ')[0].trim().toLowerCase().includes(teacherToRemove)
                       );
                       
                       if (safeSubs.length > 0) {
@@ -1427,68 +1436,78 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
                       } else {
                           day.lessons[override.index] = { noLesson: {} };
                       }
-                  } else {
-                      day.lessons[override.index] = { noLesson: {} };
                   }
               } 
+              // ==========================================
+              // КЕЙС 2: ПОЛНОЦЕННАЯ ЗАМЕНА ПРЕДМЕТА
+              // ==========================================
               else {
-                  const combinedSubgroups: any[] = [];
                   const lessonName = willBe.commonLesson?.name || willBe.subgroupedLesson?.name || baseLesson?.commonLesson?.name || "Урок";
+                  const isWillBeCommon = willBe.commonLesson && (!willBe.commonLesson.subgroup_index || willBe.commonLesson.subgroup_index === 0);
 
-                  const addSubs = (lesson: any) => {
-                    if (!lesson || lesson.noLesson) return;
-                    if (lesson.commonLesson) combinedSubgroups.push(lesson.commonLesson);
-                    else if (lesson.subgroupedLesson && lesson.subgroupedLesson.subgroups) {
-                        combinedSubgroups.push(...lesson.subgroupedLesson.subgroups);
-                    }
-                  };
-
-                  if (!shouldBe || shouldBe.noLesson) {
-                    addSubs(willBe);
-                  } 
-                  else {
-                    const existingSubs: any[] = [];
-                    if (baseLesson?.commonLesson) existingSubs.push(baseLesson.commonLesson);
-                    else if (baseLesson?.subgroupedLesson?.subgroups) {
-                        existingSubs.push(...baseLesson.subgroupedLesson.subgroups);
-                    }
-
-                    const getLastName = (t: string) => (t || "").split(' ')[0].trim().toLowerCase();
-                    const teacherToReplace = getLastName(shouldBe?.commonLesson?.teacher || "");
-
-                    const keptSubs = existingSubs.filter(s => 
-                      !teacherToReplace || getLastName(s.teacher) !== teacherToReplace
-                    );
-
-                    combinedSubgroups.push(...keptSubs);
-                    addSubs(willBe);
-                  }
-
-                  if (combinedSubgroups.length > 1) {
+                  if (isWillBeCommon) {
+                      // Тотальное перекрытие новой общей парой (Кейс Д-1-1)
                       day.lessons[override.index] = {
-                        subgroupedLesson: {
-                          name: lessonName,
-                          subgroups: combinedSubgroups.map((s, i) => ({
-                            ...s,
-                            subgroup_index: s.subgroup_index || i + 1
-                          }))
-                        }
+                          commonLesson: {
+                              name: lessonName,
+                              teacher: willBe.commonLesson!.teacher,
+                              room: willBe.commonLesson!.room,
+                              group: willBe.commonLesson!.group,
+                              subgroup_index: null
+                          }
                       };
-                  } else if (combinedSubgroups.length === 1) {
-                      const s = combinedSubgroups[0];
-                      day.lessons[override.index] = {
-                        commonLesson: {
-                          name: lessonName,
-                          teacher: s.teacher,
-                          room: s.room,
-                          group: s.group,
-                          subgroup_index: (s.subgroup_index === 0 || !s.subgroup_index) ? null : s.subgroup_index
-                        }
-                      };
+                  } else {
+                      // Покомпонентное умное слияние подгрупп
+                      const combinedSubgroups: any[] = [];
+                      const existingSubs: any[] = [];
+                      
+                      if (baseLesson?.commonLesson) existingSubs.push(baseLesson.commonLesson);
+                      else if (baseLesson?.subgroupedLesson?.subgroups) existingSubs.push(...baseLesson.subgroupedLesson.subgroups);
+
+                      const getLastName = (t: string) => (t || "").split(' ')[0].trim().toLowerCase();
+                      const teacherToReplace = getLastName(shouldBe?.commonLesson?.teacher || shouldBe?.subgroupedLesson?.subgroups?.[0]?.teacher || "");
+
+                      // Удаляем старого препода подгруппы, которого заменяют
+                      const keptSubs = existingSubs.filter(s => 
+                        !teacherToReplace || getLastName(s.teacher) !== teacherToReplace
+                      );
+
+                      combinedSubgroups.push(...keptSubs);
+
+                      if (willBe.commonLesson) combinedSubgroups.push(willBe.commonLesson);
+                      else if (willBe.subgroupedLesson && willBe.subgroupedLesson.subgroups) {
+                          combinedSubgroups.push(...willBe.subgroupedLesson.subgroups);
+                      }
+
+                      if (combinedSubgroups.length > 1) {
+                          day.lessons[override.index] = {
+                            subgroupedLesson: {
+                              name: lessonName,
+                              subgroups: combinedSubgroups.map((s, i) => ({ ...s, subgroup_index: s.subgroup_index || i + 1 }))
+                            }
+                          };
+                      } else if (combinedSubgroups.length === 1) {
+                          const s = combinedSubgroups[0];
+                          day.lessons[override.index] = {
+                            commonLesson: {
+                              name: lessonName,
+                              teacher: s.teacher,
+                              room: s.room,
+                              group: s.group,
+                              subgroup_index: (s.subgroup_index === 0 || !s.subgroup_index) ? null : s.subgroup_index
+                            }
+                          };
+                      }
                   }
               }
+              
+              // Проставляем триггер успешного применения замены
               if (day.lessons[override.index]) {
                   (day.lessons[override.index] as any).isAppliedOverride = true;
+                  // Если пара отменена, принудительно блокируем её перезапись в методе lessonsToShow
+                  if (isCancellation) {
+                      (day.lessons[override.index] as any).noLesson = true;
+                  }
               }
           }
         });
@@ -1497,7 +1516,6 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
     setDisplaySchedule(newSchedule);
     setDataVersion(v => v + 1);
   }, [fullSchedule, overrides, applyOverrides, calendarEvents, selectedDateTime, activeWeekIndex, activeDayIndex, isTeacherView, appState.profiles, currentProfileId]);
-
   // 🔥 БЕЗОПАСНАЯ ФОРМИРОВКА СПИСКА УРОКОВ
   const lessonsToShow = useMemo(() => {
       const weekData = displaySchedule?.weeks?.[activeWeekIndex % 2];
