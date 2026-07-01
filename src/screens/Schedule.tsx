@@ -1402,7 +1402,7 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
         });
     }
 
-if (substitutesDateMatches && effectiveOverrides.length > 0) {
+    if (substitutesDateMatches && effectiveOverrides.length > 0) {
       const day = currentWeekData.days[activeDayIndex];
       if (day && day.lessons) {
         effectiveOverrides.forEach(override => {
@@ -1419,8 +1419,8 @@ if (substitutesDateMatches && effectiveOverrides.length > 0) {
               if (isCancellation) {
                   const teacherToRemove = (shouldBe?.commonLesson?.teacher || shouldBe?.subgroupedLesson?.subgroups?.[0]?.teacher || "").split(' ')[0].trim().toLowerCase();
                   
-                  // 🔥 ИСПРАВЛЕНИЕ: Если мы в режиме преподавателя (isTeacherView) ИЛИ в shouldBe нет конкретного препода
-                  // ИЛИ базовый урок не разделен на подгруппы — снимаем всю пару (для данного профиля) целиком
+                  // 🔥 ИСПРАВЛЕНИЕ: В режиме преподавателя при отмене/снятии любой пары, 
+                  // имеющей отношение к его предмету, мы принудительно обнуляем слот.
                   if (isTeacherView || !teacherToRemove || !baseLesson?.subgroupedLesson) {
                       day.lessons[override.index] = { noLesson: {} };
                   } else {
