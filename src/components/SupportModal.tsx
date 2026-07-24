@@ -1,29 +1,19 @@
 // src/components/SupportModal.tsx
-import React, { useState } from 'react';
+import React from 'react';
 
 interface SupportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (message: string) => void;
+  onSubmit?: (message: string) => void;
   isLoading?: boolean;
 }
 
 export const SupportModal: React.FC<SupportModalProps> = ({ 
   isOpen, 
   onClose, 
-  onSubmit, 
   isLoading = false 
 }) => {
-  const [message, setMessage] = useState('');
-
   if (!isOpen) return null;
-
-  const handleSend = () => {
-    const trimmedMessage = message.trim();
-    if (trimmedMessage.length < 5) return;
-    onSubmit(trimmedMessage);
-    setMessage('');
-  };
 
   return (
     <div className="modern-support-overlay" onClick={onClose}>
@@ -36,7 +26,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({
             </div>
             <div className="header-labels">
               <span className="header-main-title">Техподдержка</span>
-              <span className="header-sub-title">Опишите вашу проблему</span>
+              <span className="header-sub-title">Свяжитесь с нами</span>
             </div>
           </div>
           <button className="header-close-btn" onClick={onClose} title="Закрыть">
@@ -45,18 +35,18 @@ export const SupportModal: React.FC<SupportModalProps> = ({
         </div>
 
         <div className="modern-support-body">
-          {/* НОВЫЙ БЛОК СОЦСЕТЕЙ */}
           <div className="social-links-section">
             <p className="social-title">Написать напрямую:</p>
             <div className="social-buttons-grid">
               <a href="https://vk.com/ttgtapps" target="_blank" rel="noopener noreferrer" className="social-btn vk-btn">
-                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-                  <path d="M15.073 2H8.927C3.333 2 2 3.333 2 8.927v6.146C2 20.667 3.333 22 8.927 22h6.146C20.667 22 22 20.667 22 15.073V8.927C22 3.333 20.667 2 15.073 2zm3.033 14.161h-1.55c-1.077 0-1.282-1.353-2.457-1.353-.615 0-.82.615-.82 1.282 0 .666 0 1.282-1.282 1.282h-.922c-2.308 0-4.666-1.538-6.102-3.846-1.487-2.307-2.102-5.435-2.102-5.845 0-.256.102-.513.615-.513h1.692c.41 0 .615.154.82.718.512 1.487 1.589 3.384 2.102 3.384.307 0 .41-.154.41-.615v-2.82c-.102-1.077-.82-1.23-1.025-1.23h-.256c-.256 0-.308-.256-.154-.461.359-.41.974-.462 2.153-.462.974 0 1.282.051 1.487.154.41.205.41.666.41 1.846v1.948c0 .359.205.462.308.462.205 0 .41-.154.718-.615 1.025-1.59 1.589-3.23 1.743-3.692.102-.308.256-.41.615-.41h1.794c.513 0 .615.205.513.615-.205.82-1.589 2.923-1.897 3.384-.307.462-.512.718 0 1.282.41.462 1.487 1.333 1.743 2.154.256.564-.154.718-.563.718z"/>
+                <svg viewBox="0 0 1000 1000" width="22" height="22">
+                  <path fill="#0077FF" d="M479.6,1000.4h41.7c226.7,0,339.6,0,409.6-70c69.6-70,69.6-183.3,69.6-409.2v-42.5c0-225,0-338.3-69.6-408.3c-70-70-183.3-70-409.6-70h-41.7c-226.7,0-339.6,0-409.6,70C0.5,140.4,0.5,253.8,0.5,479.6v42.5c0,225,0,338.3,70,408.3S253.8,1000.4,479.6,1000.4z"/>
+                  <path fill="#FFFFFF" d="M532.6,720.8c-227.9,0-357.9-156.2-363.3-416.2h114.2c3.8,190.8,87.9,271.7,154.6,288.3V304.6h107.5v164.6c65.8-7.1,135-82.1,158.3-164.6h107.5c-17.8,86.5-70.8,161.7-146.3,207.5C749.4,554,811.7,630,836.3,720.8H718c-22.3-79.8-90.3-138.4-172.5-148.8v148.8C545.5,720.8,532.6,720.8,532.6,720.8z"/>
                 </svg>
                 ВКонтакте
               </a>
               <a href="https://t.me/ttgtapps" target="_blank" rel="noopener noreferrer" className="social-btn tg-btn">
-                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
                   <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.32.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.892-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
                 </svg>
                 Telegram
@@ -64,55 +54,14 @@ export const SupportModal: React.FC<SupportModalProps> = ({
             </div>
           </div>
 
-          <div className="input-divider">или оставьте заявку здесь:</div>
-
-          <div className="input-wrapper">
-            <textarea 
-              className="support-message-area"
-              placeholder="Напишите, что у вас случилось или предложите идею..."
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              disabled={isLoading}
-            />
-            <div className="input-footer-info">
-              <span className={`char-status ${message.trim().length >= 5 ? 'valid' : ''}`}>
-                {message.trim().length < 5 
-                  ? `Минимум 5 симв. (осталось ${5 - message.trim().length})` 
-                  : 'Текст готов к отправке'}
-              </span>
-            </div>
-          </div>
-          
           <div className="support-status-card">
             <div className="status-icon">
               <span className="material-icons">verified_user</span>
             </div>
             <div className="status-text">
-              <p className="status-p">Ваше обращение будет рассмотрено разработчиками в приоритетном порядке.</p>
+              <p className="status-p">Нажмите на кнопку, чтобы написать нам напрямую в VK или Telegram.</p>
             </div>
           </div>
-        </div>
-
-        <div className="modern-support-footer">
-          <button 
-            className={`send-action-btn ${message.trim().length < 5 || isLoading ? 'btn-disabled' : ''}`} 
-            onClick={handleSend}
-            disabled={message.trim().length < 5 || isLoading}
-          >
-            <div className="btn-content">
-              {isLoading ? (
-                <>
-                  <span className="material-icons spin-loader">sync</span>
-                  <span>Отправка...</span>
-                </>
-              ) : (
-                <>
-                  <span className="material-icons">send</span>
-                  <span>Отправить обращение</span>
-                </>
-              )}
-            </div>
-          </button>
         </div>
       </div>
 

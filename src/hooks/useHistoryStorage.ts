@@ -25,7 +25,8 @@ function normalizeLesson(lesson: any): Lesson {
       name: common.name || '', 
       teacher: common.teacher || '', 
       room: common.room || '', 
-      group: findGroupAnywhere(common) || globalGroup 
+      group: findGroupAnywhere(common) || globalGroup,
+      subgroup_index: common.subgroup_index || common.subgroup || 0
     }};
   }
   const subgrouped = lesson.SubgroupedLesson || lesson.subgroupedLesson;

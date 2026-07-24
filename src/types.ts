@@ -5,6 +5,7 @@ export interface CommonLesson {
   teacher: string;
   room: string;
   group?: string;
+  subgroup_index?: number | null;
 }
 
 export interface SubgroupedLessonData {

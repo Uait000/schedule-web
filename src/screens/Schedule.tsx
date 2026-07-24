@@ -41,8 +41,9 @@ import { RateModal } from '../components/RateModal';
 import { findNextPractice, findUpcomingEvent, PracticeInfo } from '../utils/practiceUtils';
 import { SupportModal } from '../components/SupportModal'; 
 import { AboutModal } from '../components/AboutModal';
+import './Schedule.css';
 
-const CURRENT_APP_VERSION = '2.9.2';
+const CURRENT_APP_VERSION = '5.0.1';
 
 interface LessonData {
   notes: string;
@@ -115,7 +116,7 @@ function groupSubgroups(lessons: any[], isTeacherView: boolean): any[] {
     const currentGrouped = lessonNameMap.get(lessonName);
     
     if (lesson.commonLesson) {
-      let subIdx = lesson.commonLesson.subgroup_index || lesson.commonLesson.subgroup || 0;
+      let subIdx = lesson.commonLesson.subgroup_index || 0;
       const exists = currentGrouped.subgroupedLesson.subgroups.some((s: any) => 
         (s.subgroup_index === subIdx && subIdx !== 0) && 
         s.teacher === lesson.commonLesson.teacher && 
@@ -407,9 +408,7 @@ function DropdownMenu({
   isOpen, 
   onClose, 
   onCheckOverrides, 
-  onOpenHistory, 
   onAddCourse, 
-  onOpenNotes, 
   onInstallApp,
   onOpenAllEvents,
   onStartTour,
@@ -417,14 +416,13 @@ function DropdownMenu({
   onSupport,
   isTeacher,
   onOpenMonitoring,
-  onOpenAbout
+  onOpenAbout,
+  onShare
 }: { 
   isOpen: boolean; 
   onClose: () => void; 
   onCheckOverrides: () => void; 
-  onOpenHistory: () => void; 
   onAddCourse: () => void; 
-  onOpenNotes: () => void;
   onInstallApp: () => void;
   onOpenAllEvents: () => void;
   onStartTour: () => void;
@@ -433,6 +431,7 @@ function DropdownMenu({
   isTeacher: boolean;
   onOpenMonitoring: () => void;
   onOpenAbout: () => void;
+  onShare: () => void;
 }) { 
   const navigate = useNavigate(); 
    
@@ -442,15 +441,14 @@ function DropdownMenu({
     if (action !== 'help' && action !== 'install') onClose();
      
     if (action === 'overrides') { onCheckOverrides(); } 
-    else if (action === 'history') { onOpenHistory(); } 
     else if (action === 'addCourse') { onAddCourse(); } 
-    else if (action === 'notes') { onOpenNotes(); } 
     else if (action === 'install') { onInstallApp(); } 
     else if (action === 'allEvents') { onOpenAllEvents(); }
     else if (action === 'monitoring') { onOpenMonitoring(); }
     else if (action === 'support') { onSupport(); } 
     else if (action === 'about') { onOpenAbout(); }
     else if (action === 'rate') { onRateApp(); } 
+    else if (action === 'share') { onShare(); }
     else if (action === 'changeGroup') { 
       localStorage.removeItem('selectedId'); 
       localStorage.removeItem('userType'); 
@@ -476,20 +474,16 @@ function DropdownMenu({
               <Icon name="event_repeat" /><span>График событий</span>
             </button> 
 
-            <button className="dropdown-item" onClick={() => handleMenuClick('history')}>
-              <Icon name="history" /><span>История замен</span>
-            </button> 
-
-            <button className="dropdown-item" onClick={() => handleMenuClick('notes')}>
-              <Icon name="description" /><span>Мои заметки</span>
-            </button> 
-
             <button className="dropdown-item" onClick={() => handleMenuClick('addCourse')}>
               <Icon name="add_circle" /><span>Добавить курсы</span>
             </button> 
 
             <button className="dropdown-item" onClick={() => handleMenuClick('install')}>
               <Icon name="download" /><span>Установить приложение</span>
+            </button> 
+
+            <button className="dropdown-item" onClick={() => handleMenuClick('share')}>
+              <Icon name="share" /><span>Поделиться</span>
             </button> 
 
             <button className="dropdown-item" onClick={() => handleMenuClick('changeGroup')}>
@@ -658,180 +652,12 @@ const uniqueGroups = useMemo(() => {
         
         <button className="monitoring-close-btn" onClick={onClose}>Вернуться</button>
       </div>
-
-      <style>{`
-        .monitoring-overlay {
-          position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-          background: rgba(0,0,0,0.85); backdrop-filter: blur(14px);
-          z-index: 100000; display: flex; align-items: center; justify-content: center; padding: 16px;
-          animation: mFadeIn 0.3s ease;
-        }
-        @keyframes mFadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-        .monitoring-card {
-          background: var(--color-surface, #1c1c1e);
-          width: 100%; max-width: 850px; border-radius: 36px;
-          padding: 32px; color: var(--color-text, #fff); border: 1px solid rgba(255,255,255,0.1);
-          box-shadow: 0 40px 100px rgba(0,0,0,0.6);
-          display: flex; flex-direction: column; max-height: 90vh;
-        }
-
-        .monitoring-header { margin-bottom: 30px; flex-shrink: 0; }
-        .monitoring-nav { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 20px; }
-        
-        .nav-arrow.active { 
-          background: var(--color-primary, #8c67f6) !important; 
-          color: #fff !important; 
-          border-radius: 16px; 
-          width: 58px; 
-          height: 58px; 
-          display: flex; 
-          align-items: center; 
-          justify-content: center; 
-          cursor: pointer; 
-          border: none;
-          box-shadow: 0 8px 25px rgba(140, 103, 246, 0.5);
-          transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-          opacity: 1 !important;
-          z-index: 5;
-        }
-        .nav-arrow.active:active { transform: scale(0.9) rotate(-5deg); }
-        .nav-arrow.active .material-icons { font-size: 36px !important; color: #fff !important; }
-
-        .nav-title { text-align: center; flex: 1; }
-        .nav-title h3 { margin: 0; font-weight: 950; font-size: 32px; letter-spacing: -1px; color: var(--color-text); }
-        .nav-title p { opacity: 0.6; margin: 8px 0 0 0; text-transform: capitalize; font-weight: 800; font-size: 17px; color: var(--color-text); }
-        
-        .monitoring-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 300px; }
-        
-        .monitoring-table-wrapper { 
-          overflow-y: auto; 
-          overflow-x: auto;
-          margin-bottom: 25px; 
-          border-radius: 20px; 
-          background: rgba(255,255,255,0.02); 
-          border: 1px solid rgba(255,255,255,0.05); 
-          flex: 1;
-          scrollbar-width: thin;
-          scrollbar-color: var(--color-primary) transparent;
-        }
-        
-        .monitoring-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 600px; }
-        
-        .sticky-header {
-          position: sticky;
-          top: 0;
-          z-index: 10;
-          background: var(--color-surface, #1c1c1e);
-          padding: 24px !important;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-          color: var(--color-primary, #8c67f6) !important; 
-          font-weight: 950 !important; 
-          font-size: 20px !important; 
-          text-transform: uppercase;
-          border-bottom: 2px solid rgba(255,255,255,0.1);
-        }
-        
-        .monitoring-table td { 
-          padding: 22px; 
-          text-align: center; 
-          border-bottom: 1px solid rgba(255,255,255,0.04); 
-          border-right: 1px solid rgba(255,255,255,0.04);
-        }
-        
-        .group-name-cell { 
-          position: sticky;
-          left: 0;
-          z-index: 5;
-          text-align: center !important; 
-          font-weight: 900; 
-          font-size: 19px; 
-          background: var(--color-surface, #1c1c1e); 
-          color: var(--color-text);
-          min-width: 130px;
-        }
-        
-        .slot-cell { font-size: 12px; font-weight: 950; text-transform: uppercase; letter-spacing: 1px; }
-        .slot-cell.free { color: #4cd964; background: rgba(76, 217, 100, 0.12); }
-        .slot-cell.busy { color: rgba(255,255,255,0.1); font-weight: 700; }
-        
-        .monitoring-close-btn {
-          width: 100%; padding: 22px; border-radius: 24px; border: none;
-          background: var(--color-primary, #8c67f6); color: white; font-weight: 900; cursor: pointer;
-          font-size: 17px; transition: all 0.2s; box-shadow: 0 6px 25px rgba(140, 103, 246, 0.4);
-          flex-shrink: 0;
-        }
-        .monitoring-close-btn:active { transform: translateY(2px); box-shadow: none; }
-        .monitoring-loader { padding: 120px 0; text-align: center; font-weight: 900; opacity: 0.5; font-size: 20px; }
-
-        @media (prefers-color-scheme: light) {
-          .monitoring-overlay { background: rgba(0,0,0,0.5); }
-          .monitoring-card { background: #ffffff; border-color: rgba(0,0,0,0.1); box-shadow: 0 40px 100px rgba(0,0,0,0.2); color: #000; }
-          .monitoring-table-wrapper { background: #f8f9fa; border-color: rgba(0,0,0,0.08); }
-          .sticky-header { background: #ffffff; color: #8c67f6 !important; border-bottom: 3px solid #eee; box-shadow: 0 2px 8px rgba(0,0,0,0.08); font-size: 20px !important; }
-          .group-name-cell { background: #ffffff; color: #000; font-size: 19px; }
-          .slot-cell.busy { color: rgba(0,0,0,0.18); background: #fafafa; }
-          .slot-cell.free { background: rgba(76, 217, 100, 0.18); color: #1e7e34; }
-          .monitoring-table td { border-color: #eee; }
-          .nav-arrow.active { box-shadow: 0 8px 20px rgba(140, 103, 246, 0.4); }
-          .nav-title h3, .nav-title p { color: #000; }
-          .monitoring-close-btn { box-shadow: 0 6px 20px rgba(140, 103, 246, 0.3); }
-        }
-
-        .container { position: relative; }
-      `}</style>
     </div>,
     document.body
   );
 }
 
-function processSubgroupedOverride(originalLesson: Lesson, overrideWillBe: Lesson): Lesson {
-  if (!originalLesson?.subgroupedLesson) return overrideWillBe;
-  if (!overrideWillBe || overrideWillBe.noLesson) return { noLesson: {} };
-  if (!overrideWillBe.subgroupedLesson) return overrideWillBe;
-
-  const originalName = originalLesson.subgroupedLesson.name;
-  const overrideName = overrideWillBe.subgroupedLesson.name;
-  if (originalName !== overrideName) return overrideWillBe;
-
-  const originalSubgroups = originalLesson.subgroupedLesson.subgroups || [];
-  const overrideSubgroups = overrideWillBe.subgroupedLesson.subgroups || [];
-   
-  const originalSubgroupsMap = new Map();
-  originalSubgroups.forEach(sub => {
-    const key = sub.subgroup_index || 0;
-    originalSubgroupsMap.set(key, { ...sub });
-  });
-   
-  overrideSubgroups.forEach(overrideSub => {
-    const key = overrideSub.subgroup_index || 0;
-    const isCancelled = (
-      (overrideSub.teacher === 'нет' || !overrideSub.teacher || overrideSub.teacher === 'null') ||
-      (overrideSub.room === 'нет' || !overrideSub.room || overrideSub.room === 'null') ||
-      (overrideSub.group === 'нет' || !overrideSub.group || overrideSub.group === 'null')
-    );
-      
-    if (isCancelled) {
-      originalSubgroupsMap.delete(key);
-    } else {
-      originalSubgroupsMap.set(key, overrideSub);
-    }
-  });
-   
-  if (originalSubgroupsMap.size === 0) return { noLesson: {} };
-   
-  const sortedSubgroups = Array.from(originalSubgroupsMap.values())
-    .sort((a, b) => (a.subgroup_index || 0) - (b.subgroup_index || 0));
-   
-  return {
-    subgroupedLesson: {
-      name: originalName,
-      subgroups: sortedSubgroups
-    }
-  };
-}
-
-function Snackbar({ message, isVisible, onClose, link, linkText }: { message: string; isVisible: boolean; onClose: () => void; link?: string | null; linkText?: string; }) { 
+function Snackbar({ message, isVisible, onClose, link, linkText }: { message: string; isVisible: boolean; onClose: () => void; link?: string | null; linkText?: string; }) {
   useEffect(() => { 
     if (isVisible) { 
       const timer = setTimeout(() => { onClose(); }, 7000); 
@@ -876,6 +702,629 @@ function Snackbar({ message, isVisible, onClose, link, linkText }: { message: st
   ); 
 }
 
+// ==========================================
+// OVERRIDE PROCESSING HELPERS
+// ==========================================
+
+/** Extract teacher last name (first word) for matching */
+function getTeacherLastName(teacher: string): string {
+  return (teacher || "").split(' ')[0].trim().toLowerCase();
+}
+
+/** Check if a lesson/subgroup is cancelled based on various indicators */
+function isLessonCancelled(data: any): boolean {
+  if (!data) return false;
+  if (data.noLesson) return true;
+  
+  const teacher = (data.teacher || "").toLowerCase().trim();
+  const room = (data.room || "").toLowerCase().trim();
+  const group = (data.group || "").toLowerCase().trim();
+  
+  // Various cancellation indicators
+  const cancelIndicators = ['нет', 'null', 'снят', 'снята', 'снято', 'отмена', 'отменено', ''];
+  
+  if (cancelIndicators.includes(teacher)) return true;
+  if (teacher.includes('снят') || teacher.includes('отмен')) return true;
+  if (room === 'нет' || room === 'null' || room.includes('снят')) return true;
+  if (group === 'нет' || group === 'null') return true;
+  
+  return false;
+}
+
+/** Check if an override represents a cancellation */
+function isOverrideCancellation(willBe: Lesson): boolean {
+  if (willBe === null || willBe === undefined) return true;
+  if (willBe.noLesson) return true;
+  
+  if (willBe.commonLesson) {
+    const teacher = (willBe.commonLesson.teacher || "").toLowerCase();
+    if (teacher === 'нет' || teacher.includes('снят') || teacher.includes('отмен')) return true;
+    if (isLessonCancelled(willBe.commonLesson)) return true;
+  }
+  
+  if (willBe.subgroupedLesson?.subgroups) {
+    const allCancelled = willBe.subgroupedLesson.subgroups.every(s => isLessonCancelled(s));
+    if (allCancelled) return true;
+  }
+  
+  return false;
+}
+
+/** Deduplicate subgroups by teacher last name + group */
+function deduplicateSubgroups(subgroups: any[]): any[] {
+  const seen = new Map<string, any>();
+  
+  for (const sub of subgroups) {
+    if (isLessonCancelled(sub)) continue;
+    
+    const key = `${getTeacherLastName(sub.teacher)}_${sub.group || ""}`;
+    if (!seen.has(key)) {
+      seen.set(key, { ...sub });
+    }
+  }
+  
+  return Array.from(seen.values());
+}
+
+/**
+ * Smart merge of override into base lesson.
+ * Handles all scenarios:
+ * 1. Full cancellation → noLesson
+ * 2. Partial cancellation (one subgroup) → keep the other
+ * 3. Teacher replacement → swap in correct subgroup
+ * 4. Combined groups → merge groups for teacher
+ * 5. Duplicate teachers → deduplicate
+ */
+function applyOverrideToLesson(
+  baseLesson: Lesson,
+  willBe: Lesson,
+  shouldBe: Lesson,
+  isTeacherView: boolean
+): Lesson {
+  console.log('[OVERRIDE] applyOverrideToLesson:', {
+    baseType: baseLesson?.commonLesson ? 'common' : baseLesson?.subgroupedLesson ? 'subgrouped' : baseLesson?.noLesson ? 'noLesson' : baseLesson === null ? 'null' : 'unknown',
+    willBeType: willBe?.commonLesson ? 'common' : willBe?.subgroupedLesson ? 'subgrouped' : willBe?.noLesson ? 'noLesson' : willBe === null ? 'null' : 'unknown',
+    shouldBeType: shouldBe?.commonLesson ? 'common' : shouldBe?.subgroupedLesson ? 'subgrouped' : shouldBe?.noLesson ? 'noLesson' : shouldBe === null ? 'null' : 'unknown',
+    isTeacherView,
+    subgroupCount: baseLesson?.subgroupedLesson?.subgroups?.length || 0,
+    willBeSubgroupIndex: willBe?.commonLesson?.subgroup_index
+  });
+  // If base is empty, just return willBe (or noLesson if cancelled)
+  if (!baseLesson || baseLesson.noLesson) {
+    if (isOverrideCancellation(willBe)) return { noLesson: {} };
+    return willBe;
+  }
+  
+  // ==========================================
+  // SCENARIO 0: TOTAL REPLACEMENT
+  // willBe.commonLesson with subgroup_index: null means "replace ENTIRE lesson"
+  // This must be checked FIRST before any mixed-type logic
+  // ==========================================
+  if (willBe?.commonLesson && (!willBe.commonLesson.subgroup_index || willBe.commonLesson.subgroup_index === 0 || willBe.commonLesson.subgroup_index === null)) {
+    return {
+      commonLesson: {
+        name: willBe.commonLesson.name,
+        teacher: willBe.commonLesson.teacher,
+        room: willBe.commonLesson.room,
+        group: willBe.commonLesson.group || (baseLesson.commonLesson?.group || baseLesson.subgroupedLesson?.subgroups?.[0]?.group),
+        subgroup_index: null
+      }
+    };
+  }
+  
+  // ==========================================
+  // SCENARIO: Cancellation
+  // ==========================================
+  if (isOverrideCancellation(willBe)) {
+    // Teacher view: cancel entirely
+    if (isTeacherView) {
+      console.log('[OVERRIDE] Teacher view — cancel entire lesson');
+      return { noLesson: {} };
+    }
+    
+    // Determine WHAT to cancel:
+    const cancelSubgroupIndex = shouldBe?.commonLesson?.subgroup_index;
+    const teacherToCancel = getTeacherLastName(
+      shouldBe?.commonLesson?.teacher || ""
+    );
+    
+    console.log('[OVERRIDE] Cancellation:', { cancelSubgroupIndex, teacherToCancel, baseHasSubgroups: !!baseLesson?.subgroupedLesson?.subgroups });
+    
+    // If base has subgroups, try to filter out only the cancelled one
+    if (baseLesson.subgroupedLesson?.subgroups) {
+      const remaining = baseLesson.subgroupedLesson.subgroups.filter(s => {
+        // PRIORITY 1: Match by teacher name (most reliable)
+        if (teacherToCancel) {
+          return getTeacherLastName(s.teacher) !== teacherToCancel;
+        }
+        // PRIORITY 2: Match by subgroup_index (fallback)
+        if (cancelSubgroupIndex && cancelSubgroupIndex > 0) {
+          return (s.subgroup_index || 0) !== cancelSubgroupIndex;
+        }
+        // No match criteria — keep all
+        return true;
+      });
+      
+      console.log('[OVERRIDE] Remaining subgroups:', remaining.length, remaining.map(s => s.teacher));
+      
+      // Nothing was filtered — return original lesson
+      if (remaining.length === baseLesson.subgroupedLesson.subgroups.length) {
+        return baseLesson;
+      }
+      if (remaining.length === 0) return { noLesson: {} };
+      if (remaining.length === 1) {
+        return {
+          commonLesson: {
+            name: baseLesson.subgroupedLesson.name,
+            teacher: remaining[0].teacher,
+            room: remaining[0].room,
+            group: remaining[0].group,
+            subgroup_index: null
+          }
+        };
+      }
+      return {
+        subgroupedLesson: {
+          name: baseLesson.subgroupedLesson.name,
+          subgroups: remaining
+        }
+      };
+    }
+    
+    // Base is common lesson - check if it matches the cancelled teacher
+    if (baseLesson.commonLesson) {
+      if (teacherToCancel && getTeacherLastName(baseLesson.commonLesson.teacher) === teacherToCancel) {
+        return { noLesson: {} };
+      }
+    }
+    
+    return { noLesson: {} };
+  }
+  
+  // ==========================================
+  // SCENARIO: Full replacement (commonLesson → commonLesson)
+  // ==========================================
+  if (willBe.commonLesson && baseLesson.commonLesson) {
+    const willBeSubgroup = willBe.commonLesson.subgroup_index;
+    
+    // willBe targets a specific subgroup - replace that one
+    return {
+      commonLesson: {
+        name: willBe.commonLesson.name || baseLesson.commonLesson.name,
+        teacher: willBe.commonLesson.teacher,
+        room: willBe.commonLesson.room,
+        group: willBe.commonLesson.group || baseLesson.commonLesson.group,
+        subgroup_index: willBeSubgroup
+      }
+    };
+  }
+  
+  // ==========================================
+  // SCENARIO: Subgrouped replacement (subgroupedLesson → subgroupedLesson)
+  // ==========================================
+  if (willBe.subgroupedLesson && baseLesson.subgroupedLesson) {
+    const willBeSubgroups = willBe.subgroupedLesson.subgroups || [];
+    const baseSubgroups = [...(baseLesson.subgroupedLesson.subgroups || [])];
+    
+    // Process each willBe subgroup
+    for (const wSub of willBeSubgroups) {
+      if (isLessonCancelled(wSub)) {
+        // Remove matching subgroup from base
+        const idx = baseSubgroups.findIndex(s => 
+          (s.subgroup_index || 0) === (wSub.subgroup_index || 0)
+        );
+        if (idx !== -1) baseSubgroups.splice(idx, 1);
+      } else {
+        // Replace or add subgroup
+        const existingIdx = baseSubgroups.findIndex(s => 
+          (s.subgroup_index || 0) === (wSub.subgroup_index || 0)
+        );
+        if (existingIdx !== -1) {
+          baseSubgroups[existingIdx] = { ...wSub };
+        } else {
+          baseSubgroups.push({ ...wSub });
+        }
+      }
+    }
+    
+    if (baseSubgroups.length === 0) return { noLesson: {} };
+    
+    // Deduplicate by teacher
+    const deduped = deduplicateSubgroups(baseSubgroups);
+    
+    if (deduped.length === 0) return { noLesson: {} };
+    if (deduped.length === 1) {
+      return {
+        commonLesson: {
+          name: willBe.subgroupedLesson.name || baseLesson.subgroupedLesson.name,
+          teacher: deduped[0].teacher,
+          room: deduped[0].room,
+          group: deduped[0].group,
+          subgroup_index: null
+        }
+      };
+    }
+    
+    return {
+      subgroupedLesson: {
+        name: willBe.subgroupedLesson.name || baseLesson.subgroupedLesson.name,
+        subgroups: deduped.map((s, i) => ({ ...s, subgroup_index: i + 1 }))
+      }
+    };
+  }
+  
+  // ==========================================
+  // SCENARIO: Mixed (common → subgrouped or vice versa)
+  // ==========================================
+  if (willBe.commonLesson && baseLesson.subgroupedLesson) {
+    const teacherToReplace = getTeacherLastName(
+      shouldBe?.commonLesson?.teacher || 
+      shouldBe?.subgroupedLesson?.subgroups?.[0]?.teacher || ""
+    );
+    
+    // Find and replace the matching subgroup
+    const remaining = baseLesson.subgroupedLesson.subgroups.filter(s => 
+      getTeacherLastName(s.teacher) !== teacherToReplace
+    );
+    
+    // Add the new teacher
+    remaining.push({
+      teacher: willBe.commonLesson.teacher,
+      room: willBe.commonLesson.room,
+      group: willBe.commonLesson.group,
+      subgroup_index: willBe.commonLesson.subgroup_index || remaining.length + 1
+    });
+    
+    const deduped = deduplicateSubgroups(remaining);
+    
+    if (deduped.length === 0) return { noLesson: {} };
+    if (deduped.length === 1) {
+      return {
+        commonLesson: {
+          name: willBe.commonLesson.name || baseLesson.subgroupedLesson.name,
+          teacher: deduped[0].teacher,
+          room: deduped[0].room,
+          group: deduped[0].group,
+          subgroup_index: null
+        }
+      };
+    }
+    
+    return {
+      subgroupedLesson: {
+        name: willBe.commonLesson.name || baseLesson.subgroupedLesson.name,
+        subgroups: deduped.map((s, i) => ({ ...s, subgroup_index: i + 1 }))
+      }
+    };
+  }
+  
+  if (willBe.subgroupedLesson && baseLesson.commonLesson) {
+    const willBeSubs = willBe.subgroupedLesson.subgroups || [];
+    const combined = [
+      { ...baseLesson.commonLesson, subgroup_index: baseLesson.commonLesson.subgroup_index || 1 },
+      ...willBeSubs.map(s => ({ ...s, subgroup_index: s.subgroup_index || 2 }))
+    ];
+    
+    const deduped = deduplicateSubgroups(combined);
+    
+    if (deduped.length === 0) return { noLesson: {} };
+    if (deduped.length === 1) {
+      return {
+        commonLesson: {
+          name: willBe.subgroupedLesson.name || baseLesson.commonLesson.name,
+          teacher: deduped[0].teacher,
+          room: deduped[0].room,
+          group: deduped[0].group,
+          subgroup_index: null
+        }
+      };
+    }
+    
+    return {
+      subgroupedLesson: {
+        name: willBe.subgroupedLesson.name || baseLesson.commonLesson.name,
+        subgroups: deduped.map((s, i) => ({ ...s, subgroup_index: i + 1 }))
+      }
+    };
+  }
+  
+  // Fallback: return willBe as-is
+  console.log('[OVERRIDE] Fallback: returning willBe as-is');
+  return willBe;
+}
+
+// ==========================================
+// SHARE MODAL COMPONENT
+// ==========================================
+
+function ShareModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const WEB_URL = 'https://schedulettgt-static.website.yandexcloud.net/';
+  const ANDROID_URL = 'https://schedulettgt.ru/schedule/android/download';
+  const [activeTab, setActiveTab] = useState<'web' | 'android'>('web');
+  const [copied, setCopied] = useState(false);
+
+  if (!isOpen) return null;
+
+  const currentUrl = activeTab === 'web' ? WEB_URL : ANDROID_URL;
+  const qrColor = activeTab === 'web' ? '6650a4' : '4CAF50';
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(currentUrl);
+    } catch {
+      const input = document.createElement('input');
+      input.value = currentUrl;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      document.body.removeChild(input);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleNativeShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Расписание ТТЖТ',
+          text: activeTab === 'web' ? 'Открой расписание ТТЖТ в браузере' : 'Скачай приложение ТТЖТ на Android',
+          url: currentUrl
+        });
+      } catch {}
+    } else {
+      handleCopyLink();
+    }
+  };
+
+  return (
+    <div className="share-overlay" onClick={onClose}>
+      <div className="share-modal" onClick={e => e.stopPropagation()}>
+        
+        {/* Handle */}
+        <div className="share-handle" />
+
+        {/* Header */}
+        <div className="share-header">
+          <div className="share-icon-box">
+            <span className="material-icons">share</span>
+          </div>
+          <h3>Поделиться</h3>
+        </div>
+
+        {/* Tabs */}
+        <div className="share-tabs">
+          <button 
+            className={`share-tab ${activeTab === 'web' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('web'); setCopied(false); }}
+          >
+            <span className="material-icons">language</span>
+            Веб-версия
+          </button>
+          <button 
+            className={`share-tab ${activeTab === 'android' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('android'); setCopied(false); }}
+          >
+            <span className="material-icons">android</span>
+            Android
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="share-content">
+          {activeTab === 'web' ? (
+            <div className="share-tab-content">
+              <div className="share-qr-wrap">
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(WEB_URL)}&bgcolor=ffffff&color=6650a4`} 
+                  alt="QR Code веб-версии" 
+                  width="180" 
+                  height="180"
+                />
+              </div>
+              <div className="share-link-box">
+                <span className="share-link-text">{WEB_URL}</span>
+              </div>
+              <p className="share-hint">
+                Отсканируйте QR-код камерой телефона, чтобы открыть расписание в браузере
+              </p>
+            </div>
+          ) : (
+            <div className="share-tab-content">
+              <div className="share-qr-wrap android">
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(ANDROID_URL)}&bgcolor=ffffff&color=4CAF50`} 
+                  alt="QR Code Android приложения" 
+                  width="180" 
+                  height="180"
+                />
+              </div>
+              <div className="share-link-box">
+                <span className="share-link-text">{ANDROID_URL}</span>
+              </div>
+              <p className="share-hint">
+                Отсканируйте QR-код для скачивания APK-файла
+              </p>
+              <div className="share-warning">
+                <span className="material-icons">info</span>
+                <span>Приложение доступно только для Android. На iPhone/iPad работать не будет</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="share-actions">
+          {navigator.share && (
+            <button className="share-action-btn primary" onClick={handleNativeShare}>
+              <span className="material-icons">ios_share</span>
+              Поделиться
+            </button>
+          )}
+          <button className="share-action-btn secondary" onClick={handleCopyLink}>
+            <span className="material-icons">{copied ? 'check_circle' : 'content_copy'}</span>
+            {copied ? 'Скопировано!' : 'Копировать ссылку'}
+          </button>
+        </div>
+
+        {/* Close */}
+        <button className="share-close-btn" onClick={onClose}>Закрыть</button>
+      </div>
+
+      <style>{`
+        .share-overlay {
+          position: fixed; inset: 0; 
+          background: rgba(0,0,0,0.7); 
+          backdrop-filter: blur(8px); 
+          display: flex; align-items: flex-end; justify-content: center; 
+          z-index: 10000; 
+          animation: fadeIn 0.2s ease;
+        }
+        .share-modal {
+          background: var(--color-surface, #1e1e1e); 
+          width: 100%; max-width: 480px; 
+          border-radius: 28px 28px 0 0; 
+          padding: 0 24px env(safe-area-inset-bottom, 24px); 
+          animation: slideUp 0.3s ease;
+          max-height: 90vh; overflow-y: auto;
+        }
+        .share-handle {
+          width: 40px; height: 4px; 
+          background: var(--color-border, #444); 
+          border-radius: 2px; 
+          margin: 16px auto 20px;
+        }
+
+        /* Header */
+        .share-header {
+          display: flex; align-items: center; gap: 16px; 
+          margin-bottom: 24px;
+        }
+        .share-icon-box {
+          width: 48px; height: 48px; 
+          background: linear-gradient(135deg, var(--color-primary, #6650a4), #7c5ac4); 
+          border-radius: 14px; 
+          display: flex; align-items: center; justify-content: center; 
+          color: white; flex-shrink: 0;
+        }
+        .share-icon-box span { font-size: 24px; }
+        .share-header h3 {
+          margin: 0; font-size: 24px; font-weight: 800; 
+          color: var(--color-text, #fff);
+        }
+
+        /* Tabs */
+        .share-tabs {
+          display: flex; gap: 8px; 
+          background: var(--color-surface-container, #2a2a2a); 
+          border-radius: 14px; padding: 4px; 
+          margin-bottom: 24px;
+        }
+        .share-tab {
+          flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+          padding: 14px 16px; border: none; border-radius: 12px;
+          background: transparent; color: var(--color-secondary-text, #999);
+          font-size: 15px; font-weight: 700; cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .share-tab span { font-size: 20px; }
+        .share-tab.active {
+          background: var(--color-primary, #6650a4); color: white;
+          box-shadow: 0 4px 12px rgba(103, 58, 183, 0.3);
+        }
+        .share-tab:not(.active):hover {
+          background: rgba(255,255,255,0.05);
+        }
+
+        /* Content */
+        .share-tab-content {
+          display: flex; flex-direction: column; align-items: center; gap: 20px;
+        }
+        .share-qr-wrap {
+          background: white; border-radius: 20px; padding: 16px;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        }
+        .share-qr-wrap.android { box-shadow: 0 4px 20px rgba(76, 175, 80, 0.2); }
+        .share-qr-wrap img { display: block; border-radius: 8px; }
+
+        .share-link-box {
+          width: 100%; padding: 14px 16px;
+          background: var(--color-surface-container, #2a2a2a);
+          border-radius: 12px; text-align: center;
+          border: 1px solid var(--color-border, #333);
+        }
+        .share-link-text {
+          font-size: 13px; font-weight: 600; 
+          color: var(--color-secondary-text, #aaa);
+          word-break: break-all;
+          font-family: 'SF Mono', 'Consolas', monospace;
+        }
+
+        .share-hint {
+          margin: 0; font-size: 15px; font-weight: 500;
+          color: var(--color-secondary-text, #999);
+          text-align: center; line-height: 1.5;
+        }
+
+        .share-warning {
+          width: 100%; display: flex; align-items: flex-start; gap: 12px;
+          padding: 16px; background: rgba(255, 152, 0, 0.1);
+          border: 1px solid rgba(255, 152, 0, 0.3);
+          border-radius: 14px;
+        }
+        .share-warning span:first-child {
+          color: #FF9800; font-size: 22px; flex-shrink: 0; margin-top: 1px;
+        }
+        .share-warning span:last-child {
+          font-size: 14px; font-weight: 600; color: #FFB74D; line-height: 1.4;
+        }
+
+        /* Actions */
+        .share-actions {
+          display: flex; gap: 12px; margin: 24px 0 16px;
+        }
+        .share-action-btn {
+          flex: 1; display: flex; align-items: center; justify-content: center; gap: 10px;
+          padding: 18px 16px; border: none; border-radius: 16px;
+          font-size: 16px; font-weight: 700; cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .share-action-btn span { font-size: 22px; }
+        .share-action-btn.primary {
+          background: var(--color-primary, #6650a4); color: white;
+        }
+        .share-action-btn.primary:hover { box-shadow: 0 4px 16px rgba(103, 58, 183, 0.4); }
+        .share-action-btn.secondary {
+          background: var(--color-surface-container, #2a2a2a); 
+          color: var(--color-text, #fff);
+          border: 1px solid var(--color-border, #333);
+        }
+        .share-action-btn.secondary:hover { background: var(--color-surface-hover, #333); }
+
+        .share-close-btn {
+          width: 100%; padding: 16px; border: none;
+          background: transparent; color: var(--color-secondary-text, #888);
+          font-size: 15px; font-weight: 600; cursor: pointer;
+          border-radius: 12px; margin-bottom: 8px;
+        }
+        .share-close-btn:hover { background: var(--color-surface-container, #2a2a2a); }
+
+        @media (prefers-color-scheme: light) {
+          .share-modal { background: #ffffff; }
+          .share-tabs { background: #f0f0f0; }
+          .share-tab:not(.active) { color: #666; }
+          .share-link-box { background: #f8f9fa; border-color: #eee; }
+          .share-link-text { color: #666; }
+          .share-hint { color: #666; }
+          .share-action-btn.secondary { background: #f0f0f0; color: #333; border-color: #ddd; }
+          .share-close-btn { color: #888; }
+          .share-close-btn:hover { background: #f0f0f0; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 export function ScheduleScreen() {
   const navigate = useNavigate();
   const scheduleListRef = useRef<HTMLDivElement>(null);
@@ -885,6 +1334,19 @@ export function ScheduleScreen() {
   const { activeDayIndex, setActiveDayIndex, activeWeekIndex, setActiveWeekIndex, applyOverrides, setApplyOverrides, selectedDate, setSelectedDate, resetToToday } = useScheduleState();
    
   const [appState, setAppState] = useState(() => dataStore.getState());
+
+  // Online/Offline tracking
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const [fullSchedule, setFullSchedule] = useState<Schedule | null>(() => {
     const userType = localStorage.getItem('userType') as ProfileType || ProfileType.STUDENT;
@@ -928,6 +1390,7 @@ export function ScheduleScreen() {
   const [isMonitoringOpen, setIsMonitoringOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false); 
   const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
   const [isRateSubmitting, setIsRateSubmitting] = useState(false);
   
   const currentProfileId = localStorage.getItem('selectedId') || 'default';
@@ -940,6 +1403,14 @@ export function ScheduleScreen() {
   const [swipeLimitReached, setSwipeLimitReached] = useState(false);
 
   const lastFetchRef = useRef<string>("");
+  const fullScheduleRef = useRef<Schedule | null>(fullSchedule);
+  const overridesRef = useRef<OverridesResponse | null>(overrides);
+  const addEntryRef = useRef(addEntry);
+
+  // Keep refs in sync with state to avoid stale closures
+  useEffect(() => { fullScheduleRef.current = fullSchedule; }, [fullSchedule]);
+  useEffect(() => { overridesRef.current = overrides; }, [overrides]);
+  useEffect(() => { addEntryRef.current = addEntry; }, [addEntry]);
 
   const showMessage = useCallback((message: string) => { 
     setSnackbarMessage(message); 
@@ -952,22 +1423,34 @@ export function ScheduleScreen() {
       const storedVersion = localStorage.getItem('app_purge_ver');
       
       if (storedVersion !== CURRENT_APP_VERSION) {
+        // Only delete old caches, not the current one
         if ('caches' in window) {
           const names = await caches.keys();
-          await Promise.all(names.map(n => caches.delete(n)));
+          await Promise.all(
+            names
+              .filter(n => !n.includes(CURRENT_APP_VERSION))
+              .map(n => caches.delete(n))
+          );
         }
         
-        if ('serviceWorker' in navigator) {
-          const regs = await navigator.serviceWorker.getRegistrations();
-          for (let r of regs) await r.unregister();
-        }
-        
+        // Let the new SW take over via skipWaiting/clientsClaim in sw.js
+        // Do NOT unregister SWs here — that causes a no-SW gap before reload
         localStorage.setItem('app_purge_ver', CURRENT_APP_VERSION);
-        window.location.replace('/?refresh=' + Date.now());
       }
     };
 
     purgeNativeCache();
+  }, []);
+
+  // 🔥 TEST: Practice simulation via console
+  const [testPracticeInfo, setTestPracticeInfo] = useState<PracticeInfo | null>(null);
+  useEffect(() => {
+    const handler = (e: CustomEvent) => {
+      setTestPracticeInfo(e.detail);
+      console.log('✅ Тестовая практика активирована:', e.detail.name);
+    };
+    window.addEventListener('testPractice', handler as EventListener);
+    return () => window.removeEventListener('testPractice', handler as EventListener);
   }, []);
 
   const handleSupportSubmit = async (text: string) => {
@@ -1022,7 +1505,6 @@ export function ScheduleScreen() {
         const info = await scheduleApi.getInfo(profileId, formattedDate, metadata.scheduleUpdate || 0, metadata.eventsHash || "");
         
         if (info.schedule) {
-            // 🔥 УЛУЧШЕННАЯ НОРМАЛИЗАЦИЯ: Превращаем все уроки в объекты Lesson сразу
             const normalizedSchedule = { 
               ...info.schedule, 
               weeks: (info.schedule.weeks || []).map((week: any) => ({
@@ -1056,13 +1538,13 @@ export function ScheduleScreen() {
                 }))
             };
             setOverrides(normalizedOverrides);
-            if (typeof addEntry === 'function') { addEntry(normalizedOverrides); }
+            if (typeof addEntryRef.current === 'function') { addEntryRef.current(normalizedOverrides); }
         }
 
         await dataStore.updateProfileMetadata(profileId, { scheduleUpdate: info.schedule_update || metadata.scheduleUpdate, eventsHash: info.events?.sha256 || metadata.eventsHash, events: events });
-        await dataStore.updateData(s => ({ ...s, profiles: { ...s.profiles, [profileType === ProfileType.TEACHER ? 'teacher' : 'student']: { ...s.profiles[profileType === ProfileType.TEACHER ? 'teacher' : 'student'], id: profileId, schedule: info.schedule || (fullSchedule as Schedule), overrides: info.overrides || (overrides as OverridesResponse) } } }));
+        await dataStore.updateData(s => ({ ...s, profiles: { ...s.profiles, [profileType === ProfileType.TEACHER ? 'teacher' : 'student']: { ...s.profiles[profileType === ProfileType.TEACHER ? 'teacher' : 'student'], id: profileId, schedule: info.schedule || (fullScheduleRef.current as Schedule), overrides: info.overrides || (overridesRef.current as OverridesResponse) } } }));
     } catch (err) { 
-        if (!cachedProfile?.schedule && !fullSchedule) {
+        if (!cachedProfile?.schedule && !fullScheduleRef.current) {
             setError('Ошибка сети. Проверьте подключение.'); 
         } else {
             console.warn('Офлайн режим: используются кэшированные данные.');
@@ -1070,7 +1552,7 @@ export function ScheduleScreen() {
     } finally { 
         setIsLoading(false); 
     }
-  }, [fullSchedule, overrides, addEntry]);
+  }, []);
 
   const handleProfileSwitch = useCallback(async (newType: ProfileType, newProfile: any) => {
     if (isSwitchingProfile) return;
@@ -1135,14 +1617,13 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
       return true; 
     } catch(e) { 
       console.error("Rate submission failed:", e);
-      localStorage.setItem('app_rated', 'true'); 
       
       if (numericStars > 3) {
         setIsRateModalOpen(false);
         showMessage("Спасибо! ❤️");
       }
       
-      return true; 
+      return false;
     } finally {
       setIsRateSubmitting(false);
     }
@@ -1280,11 +1761,30 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
       setActiveDayIndex(getDay(date) === 0 || getDay(date) === 6 ? 0 : getDayIndex(date));
   }, [setSelectedDate, setActiveWeekIndex, setActiveDayIndex]);
 
-  const checkOverrides = () => {
-    setSnackbarMessage("Проверьте актуальное расписание замен на официальном сайте ТТЖТ.");
-    setSnackbarLink("https://ttgt.org/images/pdf/zamena.pdf");
-    setSnackbarLinkText("Перейти");
-    setShowSnackbar(true);
+  const checkOverrides = async () => {
+    const selectedId = localStorage.getItem('selectedId');
+    const userType = localStorage.getItem('userType') as ProfileType;
+    if (!selectedId) return;
+    
+    if (!navigator.onLine) {
+      showMessage("Офлайн режим — данные обновятся при подключении к интернету");
+      return;
+    }
+    
+    // Force refresh by clearing the fetch cache key
+    lastFetchRef.current = "";
+    
+    setIsLoading(true);
+    showMessage("Проверяем обновления...");
+    
+    try {
+      await loadProfileData(selectedId, userType || ProfileType.STUDENT, new Date());
+      showMessage("Расписание обновлено!");
+    } catch (err) {
+      showMessage("Не удалось обновить. Попробуйте позже.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const toggleApplyOverrides = () => {
@@ -1336,37 +1836,64 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
       await loadProfileData(selectedId, userType || ProfileType.STUDENT, todayDate);
     };
     initializeData();
-  }, [navigate, resetToToday, loadProfileData, setApplyOverrides]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const selectedDateTime = selectedDate.getTime();
+
+  // 🔥 practiceInfo MUST be defined BEFORE the overrides useEffect
+  const practiceInfo = useMemo<PracticeInfo | null>(() => {
+    if (testPracticeInfo) return testPracticeInfo;
+    
+    if (isTeacherView && !appState.profiles.student?.id) return null;
+    let info: PracticeInfo | null = null;
+    const curDate = new Date(selectedDateTime), today = startOfDay(new Date());
+    const activeEvent = (calendarEvents || []).find(ev => {
+      try {
+        return isWithinInterval(curDate, { start: startOfDay(parseISO(ev.dateStart)), end: endOfDay(parseISO(ev.dateEnd)) });
+      } catch(e) { return false; }
+    });
+    
+    if (activeEvent && activeEvent.type !== 'gia' && activeEvent.code !== 'III' && activeEvent.code !== 'D') {
+        info = { name: activeEvent.title, type: activeEvent.type as any, code: activeEvent.code, dateStart: parseISO(activeEvent.dateStart), dateEnd: parseISO(activeEvent.dateEnd), daysUntil: differenceInCalendarDays(parseISO(activeEvent.dateStart), today), isActive: differenceInCalendarDays(parseISO(activeEvent.dateStart), today) <= 0 };
+    } else if (!activeEvent) {
+        const upcoming = findUpcomingEvent(calendarEvents, curDate, 4);
+        if (upcoming && upcoming.type !== 'gia') { info = upcoming; info.isActive = info.daysUntil <= 0; }
+        else if (overrides && overrides.isPractice && !['III', 'D'].includes(overrides.practiceCode || "")) {
+            info = { name: overrides.practiceTitle || "Событие", type: 'practice', dateStart: overrides.dateStart ? parseISO(overrides.dateStart) : curDate, dateEnd: overrides.dateEnd ? parseISO(overrides.dateEnd) : null, daysUntil: differenceInCalendarDays(overrides.dateStart ? parseISO(overrides.dateStart) : curDate, today), isActive: differenceInCalendarDays(overrides.dateStart ? parseISO(overrides.dateStart) : curDate, today) <= 0 };
+        }
+    }
+    return info;
+  }, [calendarEvents, selectedDateTime, overrides, isTeacherView, appState.profiles.student, testPracticeInfo]);
+
   useEffect(() => {
     const userType = localStorage.getItem('userType') as ProfileType;
     if (hasInitialized.current && currentProfileId) {
         loadProfileData(currentProfileId, userType || ProfileType.STUDENT, new Date(selectedDateTime));
     }
-  }, [selectedDateTime, currentProfileId, loadProfileData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDateTime, currentProfileId]);
 
-// 🔥 ЭФФЕКТ ДЛЯ ПРИМЕНЕНИЯ ЗАМЕН (ПОЛНОСТЬЮ ИСПРАВЛЕННЫЙ И ОТКАЗОУСТОЙЧИВЫЙ)
+// 🔥 ЭФФЕКТ ДЛЯ ПРИМЕНЕНИЯ ЗАМЕН (ПЕРЕПИСАН С УЧЁТОМ ВСЕХ ВАРИАНТОВ)
   useEffect(() => {
     if (!fullSchedule) { setDisplaySchedule(null); return; }
     
-    // Создаем глубокую копию сетки расписания
     const newSchedule = JSON.parse(JSON.stringify(fullSchedule)) as Schedule;
     const currentWeekData = newSchedule.weeks?.[activeWeekIndex % 2];
     if (!currentWeekData || !currentWeekData.days) { setDisplaySchedule(newSchedule); return; }
     
     const curDate = new Date(selectedDateTime);
-    if (!applyOverrides) { setDisplaySchedule(newSchedule); return; }
     
     let effectiveOverrides: any[] = [];
     let substitutesDateMatches = false;
 
-    if (overrides) {
+    if (applyOverrides && overrides) {
         effectiveOverrides = [...(overrides.overrides || [])];
         substitutesDateMatches = overrides.day === curDate.getDate() && overrides.month === curDate.getMonth() && overrides.year === curDate.getFullYear();
     }
 
-    if (isTeacherView) {
+    // Teacher view: also include overrides from student profiles
+    if (isTeacherView && applyOverrides) {
         const teacherName = appState.profiles.teacher?.name || "";
         const teacherLastName = teacherName.split(' ')[0]; 
         
@@ -1384,7 +1911,7 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
                         const teacherInOverride = willBe?.commonLesson?.teacher || "";
                         const subgroupTeachers = willBe?.subgroupedLesson?.subgroups?.map((s:any) => s.teacher) || [];
                         
-                        let isRelevant = teacherInOverride.includes(teacherLastName) || 
+                        const isRelevant = teacherInOverride.includes(teacherLastName) || 
                                        subgroupTeachers.some(t => t.includes(teacherLastName));
                         
                         if (isRelevant) {
@@ -1411,111 +1938,115 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
               const willBe = normalizeLesson(override.willBe);
               const shouldBe = normalizeLesson(override.shouldBe);
 
-              const isCancellation = willBe.noLesson || (willBe.commonLesson?.teacher?.toLowerCase() === 'нет') || (typeof override.willBe === 'string' && override.willBe.toLowerCase().includes('снят'));
+              // Apply the override using the smart merge function
+              day.lessons[override.index] = applyOverrideToLesson(
+                baseLesson, willBe, shouldBe, isTeacherView
+              );
 
-              // ==========================================
-              // КЕЙС 1: СНЯТИЕ ПАРЫ ИЛИ ПОДГРУППЫ (ОТМЕНА)
-              // ==========================================
-              if (isCancellation) {
-                  const teacherToRemove = (shouldBe?.commonLesson?.teacher || shouldBe?.subgroupedLesson?.subgroups?.[0]?.teacher || "").split(' ')[0].trim().toLowerCase();
-                  
-                  // 🔥 ИСПРАВЛЕНИЕ: В режиме преподавателя при отмене/снятии любой пары, 
-                  // имеющей отношение к его предмету, мы принудительно обнуляем слот.
-                  if (isTeacherView || !teacherToRemove || !baseLesson?.subgroupedLesson) {
-                      day.lessons[override.index] = { noLesson: {} };
-                  } else {
-                      // Снимаем точечно подгруппу конкретного преподавателя (для студентов)
-                      const safeSubs = (baseLesson.subgroupedLesson.subgroups || []).filter(
-                          s => !s.teacher.split(' ')[0].trim().toLowerCase().includes(teacherToRemove)
-                      );
-                      
-                      if (safeSubs.length > 0) {
-                          day.lessons[override.index] = {
-                              subgroupedLesson: { name: baseLesson.subgroupedLesson.name, subgroups: safeSubs }
-                          };
-                      } else {
-                          day.lessons[override.index] = { noLesson: {} };
-                      }
-                  }
-              } 
-              // ==========================================
-              // КЕЙС 2: ПОЛНОЦЕННАЯ ЗАМЕНА ПРЕДМЕТА
-              // ==========================================
-              else {
-                  const lessonName = willBe.commonLesson?.name || willBe.subgroupedLesson?.name || baseLesson?.commonLesson?.name || "Урок";
-                  const isWillBeCommon = willBe.commonLesson && (!willBe.commonLesson.subgroup_index || willBe.commonLesson.subgroup_index === 0);
-
-                  if (isWillBeCommon) {
-                      // Тотальное перекрытие новой общей парой (Кейс Д-1-1)
-                      day.lessons[override.index] = {
-                          commonLesson: {
-                              name: lessonName,
-                              teacher: willBe.commonLesson!.teacher,
-                              room: willBe.commonLesson!.room,
-                              group: willBe.commonLesson!.group,
-                              subgroup_index: null
-                          }
-                      };
-                  } else {
-                      // Покомпонентное умное слияние подгрупп
-                      const combinedSubgroups: any[] = [];
-                      const existingSubs: any[] = [];
-                      
-                      if (baseLesson?.commonLesson) existingSubs.push(baseLesson.commonLesson);
-                      else if (baseLesson?.subgroupedLesson?.subgroups) existingSubs.push(...baseLesson.subgroupedLesson.subgroups);
-
-                      const getLastName = (t: string) => (t || "").split(' ')[0].trim().toLowerCase();
-                      const teacherToReplace = getLastName(shouldBe?.commonLesson?.teacher || shouldBe?.subgroupedLesson?.subgroups?.[0]?.teacher || "");
-
-                      // Удаляем старого препода подгруппы, которого заменяют
-                      const keptSubs = existingSubs.filter(s => 
-                        !teacherToReplace || getLastName(s.teacher) !== teacherToReplace
-                      );
-
-                      combinedSubgroups.push(...keptSubs);
-
-                      if (willBe.commonLesson) combinedSubgroups.push(willBe.commonLesson);
-                      else if (willBe.subgroupedLesson && willBe.subgroupedLesson.subgroups) {
-                          combinedSubgroups.push(...willBe.subgroupedLesson.subgroups);
-                      }
-
-                      if (combinedSubgroups.length > 1) {
-                          day.lessons[override.index] = {
-                            subgroupedLesson: {
-                              name: lessonName,
-                              subgroups: combinedSubgroups.map((s, i) => ({ ...s, subgroup_index: s.subgroup_index || i + 1 }))
-                            }
-                          };
-                      } else if (combinedSubgroups.length === 1) {
-                          const s = combinedSubgroups[0];
-                          day.lessons[override.index] = {
-                            commonLesson: {
-                              name: lessonName,
-                              teacher: s.teacher,
-                              room: s.room,
-                              group: s.group,
-                              subgroup_index: (s.subgroup_index === 0 || !s.subgroup_index) ? null : s.subgroup_index
-                            }
-                          };
-                      }
-                  }
-              }
-              
-              // Проставляем триггер успешного применения замены
+              // Mark as applied
               if (day.lessons[override.index]) {
                   (day.lessons[override.index] as any).isAppliedOverride = true;
-                  // Если пара отменена, принудительно блокируем её перезапись в методе lessonsToShow
-                  if (isCancellation) {
+                  // Only set noLesson if the result actually IS noLesson (all subgroups removed)
+                  if (isOverrideCancellation(willBe) && day.lessons[override.index]?.noLesson) {
                       (day.lessons[override.index] as any).noLesson = true;
                   }
               }
           }
         });
+
+        // 🔥 FIX: If a subgroup was cancelled from a subgroupedLesson,
+        // and the remaining subgroup doesn't appear in any other override,
+        // add it to the next available empty slot
+        // ONLY for student view with subgroup cancellations — NOT for teacher view replacements
+        if (!isTeacherView) {
+          effectiveOverrides.forEach(override => {
+            const result = day.lessons[override.index];
+            if (!result || result.noLesson) return;
+            
+            // Only handle subgroupedLesson results (cancellation of one subgroup)
+            if (!result.subgroupedLesson) return;
+            
+            const remainingSubgroups = result.subgroupedLesson.subgroups || [];
+            if (remainingSubgroups.length === 0) return;
+            
+            const teacherNames = remainingSubgroups.map((s: any) => getTeacherLastName(s.teacher || ''));
+            const hasOverrideForRemaining = effectiveOverrides.some(o => {
+              if (o.index === override.index) return false;
+              const willBeOv = normalizeLesson(o.willBe);
+              const ovTeacher = willBeOv?.commonLesson?.teacher || '';
+              return teacherNames.includes(getTeacherLastName(ovTeacher));
+            });
+            
+            if (!hasOverrideForRemaining && remainingSubgroups.length === 1) {
+              const nextEmptyIndex = day.lessons.findIndex((l: any, i: number) => 
+                i > override.index && (!l || l.noLesson)
+              );
+              if (nextEmptyIndex !== -1 && !day.lessons[nextEmptyIndex]?.isAppliedOverride) {
+                const sub = remainingSubgroups[0];
+                day.lessons[nextEmptyIndex] = {
+                  commonLesson: {
+                    name: result.subgroupedLesson.name || '',
+                    teacher: sub.teacher || '',
+                    room: sub.room || '',
+                    group: sub.group,
+                    subgroup_index: null
+                  },
+                  isAppliedOverride: true
+                };
+              }
+            }
+          });
+        }
       }
     }
+
+    // 🔥 PRACTICE LOGIC: If group is on practice, hide regular lessons but keep replacements
+    if (practiceInfo && practiceInfo.isActive && !isTeacherView) {
+      const day = currentWeekData.days[activeDayIndex];
+      if (day && day.lessons) {
+        day.lessons.forEach((lesson, idx) => {
+          // Keep lessons that were added by overrides (replacements)
+          if (lesson && (lesson as any).isAppliedOverride) return;
+          // Hide regular lessons (practice is active, no replacement)
+          if (lesson && !lesson.noLesson) {
+            day.lessons[idx] = { noLesson: {} };
+          }
+        });
+      }
+    }
+
+    // 🔥 TEACHER VIEW: Auto-scan all groups for practice
+    if (isTeacherView) {
+      const PRACTICE_KEYWORDS = ['практика', 'аттестация', 'каникулы', 'гиа', 'ivity'];
+      const day = currentWeekData.days[activeDayIndex];
+      if (day && day.lessons) {
+        day.lessons.forEach((lesson, idx) => {
+          if (!lesson || lesson.noLesson || (lesson as any).isAppliedOverride) return;
+          
+          const lessonName = (lesson.commonLesson?.name || lesson.subgroupedLesson?.name || '').toLowerCase();
+          const isPracticeLesson = PRACTICE_KEYWORDS.some(kw => lessonName.includes(kw));
+          
+          if (isPracticeLesson) {
+            const lessonGroup = lesson.commonLesson?.group || lesson.subgroupedLesson?.subgroups?.[0]?.group || '';
+            day.lessons[idx] = {
+              commonLesson: {
+                name: lesson.commonLesson?.name || lesson.subgroupedLesson?.name || 'Практика',
+                teacher: '',
+                room: '',
+                group: lessonGroup,
+                subgroup_index: null
+              },
+              isAppliedOverride: true
+            };
+          }
+        });
+      }
+    }
+
     setDisplaySchedule(newSchedule);
     setDataVersion(v => v + 1);
-  }, [fullSchedule, overrides, applyOverrides, calendarEvents, selectedDateTime, activeWeekIndex, activeDayIndex, isTeacherView, appState.profiles, currentProfileId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fullSchedule, overrides, applyOverrides, calendarEvents, selectedDateTime, activeWeekIndex, activeDayIndex, isTeacherView, appState.profiles, currentProfileId, practiceInfo]);
   // 🔥 БЕЗОПАСНАЯ ФОРМИРОВКА СПИСКА УРОКОВ
   const lessonsToShow = useMemo(() => {
       const weekData = displaySchedule?.weeks?.[activeWeekIndex % 2];
@@ -1583,28 +2114,6 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
   const lessonToEdit = (lessonsToShow && editingLessonIndex !== null) ? lessonsToShow[editingLessonIndex] : null;
   const currentLessonData = editingLessonIndex !== null ? getSavedLessonData(currentProfileId, activeWeekIndex, activeDayIndex, editingLessonIndex) : { notes: '', subgroup: 0 };
 
-  const practiceInfo = useMemo<PracticeInfo | null>(() => {
-    if (isTeacherView && !appState.profiles.student?.id) return null;
-    let info: PracticeInfo | null = null;
-    const curDate = new Date(selectedDateTime), today = startOfDay(new Date());
-    const activeEvent = (calendarEvents || []).find(ev => {
-      try {
-        return isWithinInterval(curDate, { start: startOfDay(parseISO(ev.dateStart)), end: endOfDay(parseISO(ev.dateEnd)) });
-      } catch(e) { return false; }
-    });
-    
-    if (activeEvent && activeEvent.type !== 'gia' && activeEvent.code !== 'III' && activeEvent.code !== 'D') {
-        info = { name: activeEvent.title, type: activeEvent.type as any, code: activeEvent.code, dateStart: parseISO(activeEvent.dateStart), dateEnd: parseISO(activeEvent.dateEnd), daysUntil: differenceInCalendarDays(parseISO(activeEvent.dateStart), today), isActive: differenceInCalendarDays(parseISO(activeEvent.dateStart), today) <= 0 };
-    } else if (!activeEvent) {
-        const upcoming = findUpcomingEvent(calendarEvents, curDate, 4);
-        if (upcoming && upcoming.type !== 'gia') { info = upcoming; info.isActive = info.daysUntil <= 0; }
-        else if (overrides && overrides.isPractice && !['III', 'D'].includes(overrides.practiceCode || "")) {
-            info = { name: overrides.practiceTitle || "Событие", type: 'practice', dateStart: overrides.dateStart ? parseISO(overrides.dateStart) : curDate, dateEnd: overrides.dateEnd ? parseISO(overrides.dateEnd) : null, daysUntil: differenceInCalendarDays(overrides.dateStart ? parseISO(overrides.dateStart) : curDate, today), isActive: differenceInCalendarDays(overrides.dateStart ? parseISO(overrides.dateStart) : curDate, today) <= 0 };
-        }
-    }
-    return info;
-  }, [calendarEvents, selectedDateTime, overrides, isTeacherView, appState.profiles.student]);
-
   const handlePracticeClick = () => { if (practiceInfo) setIsPracticeModalOpen(true); };
   const currentWeekDates = useMemo(() => {
     const monday = startOfWeek(new Date(selectedDateTime), { weekStartsOn: 1 });
@@ -1613,90 +2122,15 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
 
   return (
     <>
-      <style>{` 
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=Material+Icons&display=block'); 
-        :root { font-family: 'Inter', sans-serif !important; }
-        .tab-button-content { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 0; }
-        .tab-day-name { font-size: 14px; font-weight: 700; color: var(--color-text); opacity: 0.6; }
-        .tab-day-date { font-size: 14px; font-weight: 700; color: var(--color-text); white-space: nowrap; opacity: 0.6; }
-        .tab-button.active .tab-day-name, .tab-button.active .tab-day-date { color: #8c67f6; opacity: 1; }
-        .tab-indicator { margin-top: 4px !important; height: 3px !important; border-radius: 4px !important; }
-        .calendar-modal-modern { background: var(--color-surface); width: 90%; max-width: 360px; border-radius: 28px; padding: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); animation: slideUp 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); border: 1px solid var(--color-border); }
-        .calendar-header-modern { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .calendar-month-year { font-size: 18px; font-weight: 800; text-transform: capitalize; color: var(--color-text); }
-        .calendar-nav-btn { background: var(--color-surface-container); border: none; color: var(--color-text); width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-        .calendar-input-section { margin-bottom: 24px; }
-        .input-modern-wrapper { display: flex; align-items: center; background: var(--color-surface-container); padding: 0 16px; border-radius: 16px; border: 2px solid transparent; transition: all 0.2s; }
-        .input-modern-wrapper:focus-within { border-color: var(--color-primary); background: var(--color-surface); }
-        .input-modern-wrapper input { background: transparent; border: none; color: var(--color-text); padding: 14px 0; font-size: 16px; width: 100%; outline: none; font-family: 'monospace'; text-align: center; letter-spacing: 2px; }
-        .calendar-weekdays-modern { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; margin-bottom: 12px; }
-        .calendar-weekday { font-size: 13px; font-weight: 700; color: var(--color-primary); opacity: 0.8; }
-        .calendar-days-modern { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 24px; }
-        .calendar-day-modern { aspect-ratio: 1; border: none; background: transparent; color: var(--color-text); border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s; position: relative; }
-        .calendar-day-modern.today { color: var(--color-primary); }
-        .calendar-day-modern.selected { background: var(--color-primary) !important; color: white !important; }
-        .calendar-day-modern.disabled { opacity: 0.2; cursor: not-allowed; }
-        .calendar-footer-modern { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .calendar-btn-primary { background: var(--color-primary); color: white; padding: 14px; border-radius: 16px; border: none; font-weight: 700; cursor: pointer; }
-        .calendar-btn-secondary { background: var(--color-surface-container); color: var(--color-text); padding: 14px; border-radius: 16px; border: none; font-weight: 700; cursor: pointer; }
-        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        
-        .cat-loader-container { width: fit-content; height: fit-content; display: flex; align-items: center; justify-content: center; margin: 50px auto; }
-        .cat-wrapper { width: fit-content; height: fit-content; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        .cat-svg-container { width: 100%; height: fit-content; display: flex; align-items: center; justify-content: center; position: relative; }
-        .cat-body { width: 80px; fill: var(--color-text); }
-        .cat-tail { position: absolute; width: 17px; top: 50%; animation: tail 0.5s ease-in infinite alternate-reverse; transform-origin: top; fill: var(--color-text); }
-        .cat-wall { width: 300px; stroke: var(--color-border); }
-        .cat-text-container { display: flex; flex-direction: column; width: 50px; position: absolute; margin: 0px 0px 100px 120px; }
-        .cat-zzz { color: var(--color-primary); font-weight: 700; font-size: 15px; animation: zzz 2s linear infinite; }
-        .cat-bigzzz { color: var(--color-primary); font-weight: 700; font-size: 25px; margin-left: 10px; animation: zzz 2.3s linear infinite; }
-        @keyframes tail { 0% { transform: rotateZ(60deg); } 50% { transform: rotateZ(0deg); } 100% { transform: rotateZ(-20deg); } }
-        @keyframes zzz { 0% { color: transparent; } 50% { color: var(--color-primary); } 100% { color: transparent; } }
-
-        .dropdown-overlay { position: fixed; inset: 0; z-index: 1000; background: transparent; }
-        
-        .dropdown-menu-attached {
-            position: absolute; top: 120%; right: 0; 
-            background: var(--color-surface); border-radius: 18px; box-shadow: 0 10px 40px rgba(0,0,0,0.25);
-            padding: 8px; width: 260px; z-index: 1001; border: 1px solid var(--color-border);
-            animation: scaleIn 0.2s ease forwards; transform-origin: top right;
-        }
-        @keyframes scaleIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
-        
-        .dropdown-item {
-            width: 100%; display: flex; align-items: center; padding: 12px 14px; border: none;
-            background: transparent; font-size: 14px; font-weight: 700; cursor: pointer;
-            border-radius: 12px; transition: all 0.15s; text-align: left; gap: 14px;
-        }
-        
-        .dropdown-item .material-icons { font-size: 22px; color: #a88dff; }
-        .dropdown-item span { color: var(--color-text); opacity: 0.9; }
-        .dropdown-item:hover { background: var(--color-surface-container); transform: translateX(4px); }
-
-        @media (prefers-color-scheme: dark) {
-            .dropdown-menu-attached { background: rgba(26, 26, 26, 0.9); }
-            .dropdown-item span { color: #ffffff; }
-        }
-        @media (prefers-color-scheme: light) {
-            .dropdown-menu-attached { background: rgba(255, 255, 255, 0.9); }
-            .dropdown-item span { color: #1a1a1a; }
-        }
-
-        .modern-snackbar { position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 380px; background: rgba(20, 20, 20, 0.85); backdrop-filter: blur(166px); color: #fff; border-radius: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); z-index: 2100; overflow: hidden; animation: slideUpSnack 0.5s ease; border: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; padding-right: 6px; }
-        @media (prefers-color-scheme: light) { .modern-snackbar { background: rgba(255, 255, 255, 0.85); color: #000; border: 1px solid rgba(0,0,0,0.05); } .snackbar-title { color: #000; } .snackbar-message { color: rgba(0,0,0,0.7); } .snackbar-btn { background: rgba(0,0,0,0.05); color: #000; } .snackbar-left-border { background: #6200ea; } }
-        @keyframes slideUpSnack { from { transform: translate(-50%, 100px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
-        .snackbar-left-border { width: 4px; height: 40px; background: #fff; border-radius: 10px; margin-left: 16px; }
-        .snackbar-content { display: flex; align-items: center; padding: 14px 16px; gap: 14px; flex: 1; }
-        .snackbar-icon-area { width: 40px; height: 40px; background: linear-gradient(135deg, #6200ea, #9d46ff); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-        .snackbar-text-area { flex: 1; display: flex; flex-direction: column; justify-content: center; }
-        .snackbar-title { font-weight: 800; font-size: 14px; margin-bottom: 2px; }
-        .snackbar-message { font-size: 12px; opacity: 0.8; line-height: 1.3; }
-        .snackbar-btn { padding: 8px 14px; background: rgba(255,255,255,0.15); border: none; border-radius: 14px; color: inherit; font-weight: 700; font-size: 12px; cursor: pointer; }
-
-        .container { position: relative; }
-      `}</style>
       <div className="container" style={{ fontFamily: 'Inter, sans-serif' }}>
+        {/* Offline Indicator */}
+        {!isOnline && (
+          <div className="offline-banner">
+            <span className="material-icons">cloud_off</span>
+            <span>Офлайн режим — используются сохранённые данные</span>
+          </div>
+        )}
+
         <div className="schedule-header">
           <h2 className="schedule-title" style={{ fontWeight: 800 }}>Расписание</h2>
           <div style={{ position: 'relative' }}>
@@ -1707,8 +2141,6 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
                   isOpen={isMenuOpen} 
                   onClose={() => setIsMenuOpen(false)} 
                   onCheckOverrides={checkOverrides} 
-                  onOpenHistory={() => setIsHistoryOpen(true)} 
-                  onOpenNotes={() => setIsNotesModalOpen(true)} 
                   onInstallApp={handleInstallApp} 
                   onOpenAllEvents={() => setIsAllEventsModalOpen(true)} 
                   onStartTour={startTour} 
@@ -1718,6 +2150,7 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
                   isTeacher={isTeacherView}
                   onOpenMonitoring={() => setIsMonitoringOpen(true)}
                   onOpenAbout={() => setIsAboutOpen(true)}
+                  onShare={() => setIsShareOpen(true)}
               />
           </div>
         </div>
@@ -1808,6 +2241,8 @@ const handleRateSubmit = async (stars: number, comment: string): Promise<boolean
           onSubmit={handleSupportSubmit} 
           isLoading={isSupportLoading} 
         />
+
+        <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} />
         
         <AboutModal 
           isOpen={isAboutOpen} 

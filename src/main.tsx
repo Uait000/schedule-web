@@ -3,15 +3,50 @@ import App from './App.tsx'
 import './index.css'
 import { BrowserRouter } from 'react-router-dom' 
 import { migrateOldDataToDataStore } from './utils/migration'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
-// 🔥 ИСПРАВЛЕНИЕ 1: Глобальный перехват ошибок загрузки чанков (решает проблему серого экрана при обновлениях)
+const APP_VERSION = '5.0.1';
+
+// 🔥 ИСПРАВЛЕНИЕ 1: Глобальный перехват ошибок загрузки модулей и чанков
 window.addEventListener('error', (e) => {
   const message = e.message || '';
-  if (message.includes('ChunkLoadError') || message.includes('Loading chunk')) {
-    console.warn('Обнаружена ошибка загрузки ресурсов. Перезагрузка приложения...');
-    window.location.reload();
+  const target = e.target as any;
+
+  // ChunkLoadError or module loading errors
+  if (message.includes('ChunkLoadError') ||
+      message.includes('Loading chunk') ||
+      message.includes('does not provide an export') ||
+      message.includes('Failed to fetch dynamically imported') ||
+      (target && target.tagName === 'SCRIPT')) {
+    console.warn('Ошибка загрузки модуля. Очистка кэша и перезагрузка...');
+    if ('caches' in window) {
+      caches.keys().then(names => Promise.all(names.map(n => caches.delete(n))));
+    }
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs =>
+        Promise.all(regs.map(r => r.unregister()))
+      );
+    }
+    localStorage.setItem('app_purge_ver', APP_VERSION);
+    setTimeout(() => window.location.reload(), 100);
   }
 }, true);
+
+// 🔥 ПРИНУДИТЕЛЬНАЯ ОЧИСТКА КЭША ПРИ ОБНОВЛЕНИИ
+const storedVersion = localStorage.getItem('app_purge_ver');
+if (storedVersion !== APP_VERSION) {
+  console.log(`🔄 Обновление с ${storedVersion || 'первого запуска'} → ${APP_VERSION}. Очистка кэша...`);
+  if ('caches' in window) {
+    caches.keys().then(names => Promise.all(names.map(n => caches.delete(n))));
+  }
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(regs =>
+      Promise.all(regs.map(r => r.unregister()))
+    );
+  }
+  localStorage.setItem('app_purge_ver', APP_VERSION);
+  window.location.reload();
+}
 
 // Инициализация Telegram Web App
 declare global {
@@ -84,9 +119,11 @@ const checkPWAStatus = () => {
 checkPWAStatus();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <BrowserRouter>
-    <App />
-  </BrowserRouter>
+  <ErrorBoundary>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </ErrorBoundary>
 )
 
 console.log('🚀 Расписание ТТЖТ запущено');

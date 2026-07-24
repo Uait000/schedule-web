@@ -46,11 +46,11 @@ export function NoteModal({ lesson, onClose, onSave, savedNote, savedSubgroup }:
         className="modal-content note-modal" 
         onClick={(e) => e.stopPropagation()}
         style={{
-          margin: 0, 
-          width: '100%', 
-          maxWidth: '100%', 
-          borderBottomLeftRadius: 0, 
-          borderBottomRightRadius: 0,
+          margin: '0 16px', 
+          width: 'calc(100% - 32px)', 
+          maxWidth: '568px', 
+          borderBottomLeftRadius: '24px', 
+          borderBottomRightRadius: '24px',
           borderTopLeftRadius: '24px', 
           borderTopRightRadius: '24px',
           maxHeight: '85vh', 

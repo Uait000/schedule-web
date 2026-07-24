@@ -18,7 +18,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
   const cloudsRef = useRef<HTMLDivElement>(null);
   // 🔥 Теперь у нас массив рефов для нескольких препятствий
   const obstacleRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const reqRef = useRef<number>();
+  const reqRef = useRef<number>(0);
   const gameAreaRef = useRef<HTMLDivElement>(null);
   
   const OBSTACLES_EMOJIS = ['📚', '⏰', '🖊️', '☕'];
@@ -185,7 +185,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const APP_VERSION = "2.2.5";
+  const APP_VERSION = "2.3.0";
   const isEasterEggActive = gameState !== 'hidden';
 
   return (
@@ -227,16 +227,16 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                 <h3 className="changelog-title">Что нового:</h3>
                 <ul className="changelog-list">
                   <li>
-                    <strong>Offline-First Архитектура 🚀</strong>
-                    <p>Теперь приложение автоматически сохраняет расписания групп и преподавателей, которые вы просматривали. Они остаются доступны даже без интернета! Важно: открыть профиль, который вы ни разу не загружали в онлайн-режиме, в офлайне нельзя.</p>
+                    <strong>Улучшена обработка замен</strong>
+                    <p>Исправлены ошибки при отмене подгрупп, дублировании преподавателей и совмещении групп. Теперь замены обрабатываются корректно во всех вариантах.</p>
                   </li>
                   <li>
-                    <strong>Умное кэширование замен</strong>
-                    <p>Замены (PDF) теперь привязываются к скачанному расписанию и доступны офлайн.</p>
+                    <strong>Защита от серого экрана</strong>
+                    <p>Добавлен ErrorBoundary — если произойдёт ошибка, приложение покажет экран восстановления вместо серого экрана.</p>
                   </li>
                   <li>
-                    <strong>Новая техподдержка</strong>
-                    <p>Добавлены кнопки для быстрой связи с нами в VK и Telegram.</p>
+                    <strong>Offline-First Архитектура</strong>
+                    <p>Теперь приложение автоматически сохраняет расписания групп и преподавателей, которые вы просматривали. Они остаются доступны даже без интернета!</p>
                   </li>
                 </ul>
               </div>

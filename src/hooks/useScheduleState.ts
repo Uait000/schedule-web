@@ -1,6 +1,6 @@
 import { useLocalStorage } from './useLocalStorage';
 import { getDayIndex, getWeekNumber, getCurrentDayIndex } from '../utils/dateUtils';
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, useMemo } from 'react';
 import { addDays, getDay, startOfWeek } from 'date-fns';
 
 const calculateDefaultState = () => {
@@ -115,6 +115,8 @@ export function useScheduleState() {
     migrateOldData();
   }, [profileId]);
 
+  const selectedDateObj = useMemo(() => new Date(selectedDate), [selectedDate]);
+
   return {
     activeDayIndex,
     setActiveDayIndex: setActiveDayIndexWithLimit,
@@ -122,7 +124,7 @@ export function useScheduleState() {
     setActiveWeekIndex: setActiveWeekIndexWithSave,
     applyOverrides,
     setApplyOverrides: setApplyOverridesWithSave,
-    selectedDate: new Date(selectedDate),
+    selectedDate: selectedDateObj,
     setSelectedDate: setSelectedDateWithSave,
     resetToToday
   };

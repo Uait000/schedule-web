@@ -23,8 +23,8 @@ export default defineConfig({
       manifest: {
         name: 'Расписание ТТЖТ',
         short_name: 'ТТЖТ',
-        theme_color: '#1c1c1e',
-        background_color: '#1c1c1e',
+        theme_color: '#1c1b1f',
+        background_color: '#1c1b1f',
         display: 'standalone',
         start_url: '/'
       }
@@ -33,6 +33,11 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
+    hmr: {
+      protocol: 'ws',
+      host: 'localhost',
+      port: 5173
+    },
     proxy: {
       '/api': {
         target: 'https://schedulettgt.ru',

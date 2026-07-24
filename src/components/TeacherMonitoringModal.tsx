@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { scheduleApi } from '../api';
+import { scheduleApi } from '../api/api';
 import { Schedule, Lesson } from '../types';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';

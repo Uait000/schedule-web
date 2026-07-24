@@ -69,6 +69,8 @@ export function WelcomeScreen() {
     }
   }, [isAddingProfile]);
 
+  const hasCachedItems = items.groups.length > 0;
+
   useEffect(() => {
     fetchData(`/items`)
       .then((result) => {
@@ -84,10 +86,11 @@ export function WelcomeScreen() {
       .catch(() => {
         setIsVisualLoading(false);
         setIsLoading(false);
-        if (items.groups.length === 0) {
+        if (!hasCachedItems) {
           setError('Ошибка загрузки данных. Проверьте интернет.');
         }
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const filteredGroups = items.groups.filter(group => course === 0 || group.includes(`-${course}-`));
